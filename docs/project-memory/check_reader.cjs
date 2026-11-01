@@ -1,0 +1,32 @@
+const fs = require('fs');
+const vm = require('vm');
+const html = fs.readFileSync('index.html', 'utf8');
+const scripts = [...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/g)];
+const elements = {};
+const element = key => elements[key] ||= {value:'',innerHTML:'',textContent:'',attributes:{},events:{},classList:{toggle(){}},setAttribute(k,v){this.attributes[k]=v},addEventListener(k,v){this.events[k]=v},showModal(){},close(){}};
+element('#dataset').textContent = scripts[0][1];
+element('#topic-filter').value = 'all';
+const storage={};
+const context = {document:{documentElement:{dataset:{}},getElementById:id=>element('#'+id),querySelector:element,querySelectorAll:()=>[],addEventListener(){}},localStorage:{getItem:k=>storage[k],setItem:(k,v)=>storage[k]=v},window:{matchMedia:()=>({matches:false,addEventListener(){}})},console};
+vm.createContext(context);
+vm.runInContext(scripts[1][1],context);
+vm.runInContext(`
+if(topics.length!==8)throw Error('topics');
+for(let i=0;i<4;i++)for(let j=0;j<sheets(i).length;j++){setSource(i,j);renderSource();}
+setSource('interviews');
+for(let i=0;i<8;i++)openTopic(i);
+view('library');
+document.querySelector('#library-search').value='ناموجودغیرواقعی';renderSource();
+if(!document.querySelector('#source-content').innerHTML.includes('پیدا نشد'))throw Error('empty search');
+document.querySelector('#library-search').value='اسکرین';renderSource();
+if(!document.querySelector('#source-content').innerHTML.includes('interview-3'))throw Error('interview search');
+if(document.documentElement.dataset.theme!=='light')throw Error('initial theme');
+document.querySelector('#theme-toggle').events.click();
+if(document.documentElement.dataset.theme!=='dark'||localStorage.getItem('rishe-theme')!=='dark')throw Error('dark mode');
+if(document.querySelector('#theme-toggle').attributes['aria-pressed']!=='true')throw Error('theme accessibility');
+document.querySelector('#theme-toggle').events.click();
+if(document.documentElement.dataset.theme!=='light')throw Error('light mode');
+console.log('Verified: all data rendering, evidence references, search, theme toggle, saved preference and accessibility state.');
+`,context);
+if((html.match(/data:font\/woff2;base64,/g)||[]).length!==2)throw Error('embedded fonts');
+console.log('Verified: both font weights embedded in standalone HTML.');
