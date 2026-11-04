@@ -47,10 +47,10 @@ def detect_questions(text, product, asked=None):
     plain = normalize_text(text)
     if not (
         any(c in plain for c in ["?", "؟"])
-        or re.search(r"(?:^|\s)(?:چی|چیه|چیا)(?:\s|[؟?]|$)", plain)
+        or re.search(r"(?:^|\s)(?:چی|چیه|چیا|چه)(?:\s|[؟?]|$)", plain)
         or any(
             w in plain
-            for w in ["چه ", "چطور", "کدوم", "یعنی", "بگو", "توضیح", "فرق", "چقدر", "چنده", "موجوده", "دارید"]
+            for w in ["چطور", "کدوم", "یعنی", "بگو", "توضیح", "فرق", "چقدر", "چنده", "موجوده", "دارید"]
         )
     ):
         return []

@@ -6,6 +6,16 @@ from test_order_flow import message
 from test_llm_connection import fake_service
 
 
+def test_address_with_kooche_and_packaging_is_data_not_a_question(client):
+    token = client.post('/api/chat/start', json={}).json()['token']
+    message(client, token, 'دو عدد شمع آوا وانیل بزرگ معمولی')
+    state = message(client, token, 'نام: سارا نمونه\nشهر: کرج\nتلفن: 09120000000\nآدرس: خیابان نمونه کوچه نسترن پلاک ۲۳ واحد ۵\nبسته بندی هم به صورت هدیه نظرم عوض شد')
+    assert state['draft']['delivery']['name'] == 'سارا نمونه'
+    assert state['draft']['delivery']['city'] == 'کرج'
+    assert 'کوچه نسترن' in state['draft']['delivery']['address']
+    assert state['draft']['specifications']['packaging'] == 'هدیه'
+
+
 def pending_packaging(client, env):
     token = client.post("/api/chat/start", json={}).json()["token"]
     message(client, token, "دو عدد شمع آوا وانیل بزرگ")
