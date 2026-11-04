@@ -1,0 +1,14 @@
+.git
+.env
+**/.env
+**/.env.aws
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+backend/data
+frontend/dist
+artifacts
+docs/project-memory
+docs/rishe-yabi-data-pack
+index.html

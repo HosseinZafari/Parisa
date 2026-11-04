@@ -1,0 +1,11 @@
+{
+  "name": "parisa-orders",
+  "private": true,
+  "scripts": {
+    "setup": "python -X utf8 scripts/setup.py",
+    "dev": "python -X utf8 scripts/dev.py",
+    "build": "npm --prefix frontend run build",
+    "test": "python -X utf8 scripts/check.py",
+    "reset-demo": "python -X utf8 scripts/backend.py reset-demo --yes"
+  }
+}

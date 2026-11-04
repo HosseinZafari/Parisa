@@ -1,0 +1,10 @@
+[
+  {
+    "Notification": {"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":50,"ThresholdType":"PERCENTAGE"},
+    "Subscribers": [{"SubscriptionType":"EMAIL","Address":"replace-with-your-email@example.com"}]
+  },
+  {
+    "Notification": {"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":90,"ThresholdType":"PERCENTAGE"},
+    "Subscribers": [{"SubscriptionType":"EMAIL","Address":"replace-with-your-email@example.com"}]
+  }
+]

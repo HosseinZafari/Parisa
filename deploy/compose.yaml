@@ -1,0 +1,40 @@
+services:
+  app:
+    build:
+      context: ..
+    image: parisa-orders:${IMAGE_TAG:-local}
+    env_file: .env.aws
+    restart: unless-stopped
+    volumes:
+      - order_data:/app/backend/data
+    expose:
+      - "8000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+  https:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in deploy/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+volumes:
+  order_data:
+  caddy_data:
+  caddy_config:

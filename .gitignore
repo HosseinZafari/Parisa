@@ -1,0 +1,17 @@
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+.env
+*.db
+*.db-shm
+*.db-wal
+frontend/dist/
+backend/data/
+artifacts/
+playwright-report/
+test-results/
+deploy/.env.aws
+deploy/.env
