@@ -21,6 +21,7 @@ class Seller(Timestamp, Base):
     username: Mapped[str] = mapped_column(String(100), unique=True)
     name: Mapped[str] = mapped_column(String(200), default="پریسا")
     password_hash: Mapped[str] = mapped_column(Text)
+    public_profile: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class SellerSession(Base):
@@ -82,6 +83,12 @@ class Conversation(Timestamp, Base):
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
     handover: Mapped[bool] = mapped_column(Boolean, default=False)
     llm_requests: Mapped[int] = mapped_column(Integer, default=0)
+    attention_status: Mapped[str] = mapped_column(String(20), default="none")
+    attention_priority: Mapped[str] = mapped_column(String(20), default="normal")
+    attention_version: Mapped[int] = mapped_column(Integer, default=0)
+    handover_reason: Mapped[str] = mapped_column(Text, default="")
+    attention_resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    attention_resolved_by: Mapped[str | None] = mapped_column(String(100))
 
 
 class Message(Base):
@@ -183,6 +190,8 @@ class Notification(Base):
     __tablename__ = "notifications"
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
+    conversation_id: Mapped[int | None] = mapped_column(ForeignKey("conversations.id"))
+    priority: Mapped[str] = mapped_column(String(20), default="normal")
     kind: Mapped[str] = mapped_column(String(80))
     text: Mapped[str] = mapped_column(Text)
     dedupe_key: Mapped[str] = mapped_column(String(240), unique=True)

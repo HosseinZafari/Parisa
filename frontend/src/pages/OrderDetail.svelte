@@ -483,7 +483,7 @@
 <style>
   .back-button {
     margin-bottom: 20px;
-    color: #97a28c;
+    color: var(--tone-97a28c, #97a28c);
     font-size: 11px;
   }
   .page-heading h1 :global(.status-badge) {
@@ -495,16 +495,16 @@
     align-items: center;
     justify-content: space-between;
     padding: 18px 23px;
-    background: #ebf1e3;
-    border: 1px solid #e0e9d5;
+    background: var(--tone-ebf1e3, #ebf1e3);
+    border: 1px solid var(--tone-e0e9d5, #e0e9d5);
     border-radius: 11px;
-    color: #739061;
+    color: var(--tone-739061, #739061);
     margin: 23px 0;
   }
   .order-action .eyebrow {
     display: block;
     font-size: 9px;
-    color: #98ab86;
+    color: var(--tone-98ab86, #98ab86);
   }
   .order-action strong {
     font-size: 14px;
@@ -522,15 +522,15 @@
   .product-icon {
     width: 62px;
     height: 62px;
-    background: #f2f4eb;
+    background: var(--tone-f2f4eb, #f2f4eb);
     display: grid;
     place-items: center;
-    color: #a6b091;
+    color: var(--tone-a6b091, #a6b091);
     border-radius: 13px;
   }
   .order-product p {
     font-size: 11px;
-    color: #9aa68b;
+    color: var(--tone-9aa68b, #9aa68b);
     margin-top: 6px;
   }
   .spec-grid {
@@ -543,7 +543,7 @@
   }
   .spec-grid > div > span {
     display: block;
-    color: #a0aa94;
+    color: var(--tone-a0aa94, #a0aa94);
     font-size: 10px;
     margin-bottom: 6px;
   }
@@ -562,7 +562,7 @@
   }
   .delivery-heading small {
     display: block;
-    color: #a4af99;
+    color: var(--tone-a4af99, #a4af99);
     font-size: 10px;
     margin-top: 4px;
     text-align: right;
@@ -573,7 +573,7 @@
   }
   .address {
     font-size: 12px;
-    color: #809071;
+    color: var(--tone-809071, #809071);
     margin: 20px 0;
     line-height: 2.1;
   }
@@ -582,13 +582,13 @@
     margin-top: 15px;
   }
   .shipping-blocks {
-    background: #f8f4e9;
-    border: 1px solid #eee7d6;
+    background: var(--tone-f8f4e9, #f8f4e9);
+    border: 1px solid var(--tone-eee7d6, #eee7d6);
     border-radius: 8px;
     padding: 13px;
     margin-bottom: 20px;
     font-size: 10px;
-    color: #a2916d;
+    color: var(--tone-a2916d, #a2916d);
   }
   .shipping-blocks strong {
     display: flex;
@@ -601,8 +601,8 @@
     line-height: 2.1;
   }
   .change-card {
-    border: 1px solid #e7e7dc;
-    background: #fcfcf6;
+    border: 1px solid var(--tone-e7e7dc, #e7e7dc);
+    background: var(--tone-fcfcf6, #fcfcf6);
     padding: 17px;
     border-radius: 9px;
     margin-bottom: 15px;
@@ -619,11 +619,11 @@
   }
   .change-top strong {
     font-size: 11px;
-    color: #b7996c;
+    color: var(--tone-b7996c, #b7996c);
   }
   .change-top small {
     font-size: 9px;
-    color: #a4ae95;
+    color: var(--tone-a4ae95, #a4ae95);
   }
   .change-comparison {
     display: grid;
@@ -632,7 +632,7 @@
   }
   .change-comparison > div > span {
     font-size: 10px;
-    color: #a9b19e;
+    color: var(--tone-a9b19e, #a9b19e);
   }
   .change-comparison p {
     display: flex;
@@ -643,11 +643,11 @@
     margin-top: 5px;
   }
   .change-comparison del {
-    color: #aeb6a3;
+    color: var(--tone-aeb6a3, #aeb6a3);
   }
   .change-comparison strong {
     font-weight: 500;
-    color: #769261;
+    color: var(--tone-769261, #769261);
     overflow-wrap: anywhere;
   }
   .change-card .notice-banner {
@@ -676,18 +676,18 @@
     gap: 12px;
   }
   .detail-message {
-    background: #f2f5eb;
+    background: var(--tone-f2f5eb, #f2f5eb);
     border-radius: 8px;
     padding: 13px;
     max-width: 92%;
     width: max-content;
   }
   .detail-message.from-customer {
-    background: #f6f4ee;
+    background: var(--tone-f6f4ee, #f6f4ee);
     margin-right: auto;
   }
   .detail-message > small {
-    color: #a4b295;
+    color: var(--tone-a4b295, #a4b295);
     font-size: 9px;
   }
   .detail-message p {
@@ -696,14 +696,14 @@
     overflow-wrap: anywhere;
   }
   .detail-message time {
-    color: #b1baa5;
+    color: var(--tone-b1baa5, #b1baa5);
     display: block;
     font-size: 8px;
     margin-top: 7px;
   }
   .summary-text {
     font-size: 11px;
-    color: #94a184;
+    color: var(--tone-94a184, #94a184);
     margin-bottom: 20px;
   }
   .payment-row {
@@ -718,7 +718,7 @@
   .payment-row small {
     display: block;
     font-size: 9px;
-    color: #a5af99;
+    color: var(--tone-a5af99, #a5af99);
     margin-top: 5px;
   }
   @media (max-width: 700px) {

@@ -3,6 +3,7 @@
   import { api, date, money, fa, navigate } from '../lib/api';
   import Icon from '../components/Icon.svelte';
   import Status from '../components/Status.svelte';
+  import ChatPending from '../components/ChatPending.svelte';
   let chat,
     products = [],
     message = '',
@@ -10,7 +11,11 @@
     error = '',
     log,
     loading = true;
-  let pendingMessage = null;
+  let pendingMessage = null,
+    failedMessage = null,
+    starting = false,
+    requestVersion = 0,
+    composer;
   const examples = [
     'دو عدد شمع آوا، رایحه وانیل، بزرگ، بسته‌بندی هدیه',
     'یک عدد صابون باران، نوع زیتون، بسته‌بندی معمولی',
@@ -21,13 +26,19 @@
     if (log) log.scrollTop = log.scrollHeight;
   }
   async function start() {
+    if (sending || starting) return;
+    starting = true;
+    requestVersion += 1;
     error = '';
     try {
       chat = await api('/chat/start', { method: 'POST', body: {} });
+      failedMessage = null;
       localStorage.setItem('parisa-chat', chat.token);
       await scroll();
     } catch (e) {
       error = e.message;
+    } finally {
+      starting = false;
     }
   }
   onMount(() => {
@@ -52,10 +63,19 @@
     };
     init();
     const poll = setInterval(async () => {
-      if (!chat || sending) return;
+      if (!chat || sending || starting || failedMessage) return;
+      const token = chat.token,
+        version = requestVersion;
       try {
-        const state = await api('/chat/' + chat.token);
-        if (alive) {
+        const state = await api('/chat/' + token);
+        if (
+          alive &&
+          !sending &&
+          !starting &&
+          !failedMessage &&
+          version === requestVersion &&
+          token === chat?.token
+        ) {
           const changed = state.messages.length !== chat.messages.length;
           chat = state;
           if (changed) scroll();
@@ -67,22 +87,28 @@
       clearInterval(poll);
     };
   });
-  async function send(text = message) {
-    if (!text.trim() || sending || !chat) return;
+  async function send(text = message, retry = null) {
+    if (!text.trim() || sending || starting || !chat || (failedMessage && !retry)) return;
+    const request = retry || { text: text.trim(), client_id: crypto.randomUUID() };
     sending = true;
+    requestVersion += 1;
     error = '';
-    const actual = text.trim();
-    if (!pendingMessage || pendingMessage.text !== actual)
-      pendingMessage = { text: actual, client_id: crypto.randomUUID() };
+    pendingMessage = request;
+    failedMessage = null;
+    if (!retry && message.trim() === request.text) message = '';
+    composer?.focus({ preventScroll: true });
+    scroll();
     try {
-      chat = await api('/chat/' + chat.token + '/messages', { method: 'POST', body: pendingMessage });
-      message = '';
+      chat = await api('/chat/' + chat.token + '/messages', { method: 'POST', body: request });
       pendingMessage = null;
       await scroll();
     } catch (e) {
+      failedMessage = request;
       error = e.message;
     } finally {
+      pendingMessage = null;
       sending = false;
+      await scroll();
     }
   }
   function submit(e) {
@@ -101,12 +127,8 @@
       }}
       class="chat-brand"
       ><Icon name="leaf" size={26} /><strong>پریسا</strong><span>یک گفتگوی کوچک، یک سفارش مرتب</span></a
-    ><button
-      class="btn secondary small"
-      onclick={() => {
-        pendingMessage = null;
-        start();
-      }}>گفتگوی تازه<Icon name="plus" size={15} /></button
+    ><button class="btn secondary small" disabled={sending || starting || loading} onclick={start}
+      >گفتگوی تازه<Icon name="plus" size={15} /></button
     >
   </header>
   <main class="chat-layout">
@@ -145,17 +167,19 @@
       </div>
       <div class="chat-log" bind:this={log} aria-live="polite" aria-relevant="additions">
         <div class="chat-date">امروز · یک شروع تازه</div>
-        {#if loading}<div class="loading"><span class="spinner"></span>در حال آماده‌سازی گفتگو…</div>{/if}
+        {#if loading}<ChatPending label="در حال باز کردن گفتگو…" />{/if}
         {#each chat?.messages || [] as m}<div class="message-wrap" class:customer={m.role === 'customer'}>
             <div class="message-bubble">
               <p>{m.text}</p>
               <small>{m.role === 'seller' ? 'فروشنده · ' : ''}{date(m.created_at, true)}</small>
             </div>
           </div>{/each}
-        {#if chat?.summary && !chat.order}<div class="chat-summary">
-            <div class="summary-heading">
-              <Icon name="orders" size={18} /><strong>خلاصهٔ سفارش شما</strong>
-            </div>
+        {#if chat?.summary && !chat.order}<details class="chat-summary" open={chat.ready_to_confirm}>
+            <summary class="summary-heading">
+              <Icon name="orders" size={18} /><strong
+                >{chat.ready_to_confirm ? 'خلاصهٔ سفارش شما' : 'پیش‌نویس سفارش شما'}</strong
+              ><span>مشاهدهٔ جزئیات</span><Icon name="down" size={14} />
+            </summary>
             <div class="summary-item">
               <span>{chat.summary.product_name}</span><strong>{fa(chat.summary.quantity)} عدد</strong>
             </div>
@@ -191,7 +215,7 @@
                 onclick={() => send('تأیید سفارش')}
                 >تأیید خلاصه و دریافت پیوند پرداخت<Icon name="check" size={16} /></button
               ><small class="summary-hint">تأیید شما شامل مشخصات، نشانی و مبلغ بالا است.</small>{/if}
-          </div>{/if}
+          </details>{/if}
         {#if chat?.order}<div class="chat-summary">
             <div class="summary-heading">
               <Icon name="check" size={18} /><strong
@@ -199,6 +223,11 @@
               >
             </div>
             <Status status={chat.order.status} />
+            {#if chat.order.changes?.some((change) => change.status === 'pending')}
+              <p class="summary-missing">
+                درخواست تغییر شما منتظر تأیید فروشنده است. مشخصات فعلی تا زمان تأیید حفظ می‌شوند.
+              </p>
+            {/if}
             <div class="summary-item total">
               <span>مبلغ سفارش</span><strong>{money(chat.order.total)}</strong>
             </div>
@@ -214,52 +243,102 @@
               بفرستید.
             </p>
           </div>{/if}
-        {#if sending}<div class="typing"><span></span><span></span><span></span></div>{/if}
+        {#if pendingMessage || failedMessage}
+          <div class="message-wrap customer optimistic-message">
+            <div class="message-bubble" class:delivery-uncertain={!!failedMessage}>
+              <p>{(pendingMessage || failedMessage).text}</p>
+              <small>{failedMessage ? 'ارسال پیام تأیید نشد' : 'همین الان'}</small>
+              {#if failedMessage}
+                <div class="retry-actions">
+                  <button class="text-button" onclick={() => send(failedMessage.text, failedMessage)}
+                    >تلاش دوباره</button
+                  >
+                  <button
+                    class="text-button"
+                    onclick={() => {
+                      failedMessage = null;
+                      error = '';
+                    }}>ادامه بدون تلاش دوباره</button
+                  >
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
+        {#if sending}<ChatPending />{/if}
       </div>
       {#if error}<div class="chat-error error-banner" role="alert">{error}</div>{/if}
-      {#if chat?.messages.length < 3}<div class="quick-examples">
+      {#if chat?.suggested_replies?.length}
+        <div class="quick-choices" role="group" aria-label="گزینه‌های پیشنهادی پاسخ">
+          {#each chat.suggested_replies as choice}
+            <button type="button" disabled={sending || !!failedMessage} onclick={() => send(choice)}
+              >{choice}</button
+            >
+          {/each}
+        </div>
+      {:else if chat?.messages.length < 3}<div class="quick-examples">
           {#each examples as example}<button disabled={sending} onclick={() => send(example)}
               >{example}</button
             >{/each}
         </div>{/if}
       <form class="chat-compose" onsubmit={submit}>
         <textarea
+          bind:this={composer}
           bind:value={message}
           aria-label="پیام شما"
           rows="2"
           maxlength="2000"
           placeholder="پیامت را اینجا بنویس…"
           onkeydown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
               e.preventDefault();
               send();
             }
           }}></textarea><button
           class="send-button"
-          disabled={sending || !message.trim() || !chat}
+          disabled={sending || starting || !!failedMessage || !message.trim() || !chat}
           aria-label="ارسال پیام"><Icon name="send" size={21} /></button
         >
       </form>
       <div class="compose-hint">
-        نام و نشانی را می‌توانی با این قالب بفرستی: نام: سارا؛ شهر: تهران؛ آدرس: خیابان نمونه پلاک ۱۲؛ کد
-        پستی: ۱۱۱۱۱۱۱۱۱۱
+        {#if sending}<span class="draft-hint"
+            >می‌توانی پیام بعدی را بنویسی؛ بعد از دریافت پاسخ، ارسالش کن.</span
+          >{/if}
+        نام و نشانی را می‌توانی با این قالب بفرستی: نام: سارا؛ شهر: تهران؛ آدرس: خیابان نمونه پلاک ۱۲؛ کد پستی:
+        ۱۱۱۱۱۱۱۱۱۱
       </div>
     </section>
   </main>
 </div>
 
 <style>
+  .quick-choices {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 20px;
+    border-top: 1px solid var(--line);
+  }
+  .quick-choices button {
+    min-height: 38px;
+    padding: 8px 17px;
+    border: 1px solid var(--line);
+    background: var(--mint);
+    color: var(--green);
+    border-radius: 20px;
+    font-size: 12px;
+  }
   .chat-page {
     min-height: 100vh;
-    background: #f6f8f2;
+    background: var(--tone-f6f8f2, #f6f8f2);
   }
   .chat-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid #e5ebdd;
+    border-bottom: 1px solid var(--tone-e5ebdd, #e5ebdd);
     padding: 20px max(25px, 5vw);
-    background: #fdfefa;
+    background: var(--tone-fdfefa, #fdfefa);
   }
   .chat-brand {
     display: flex;
@@ -271,7 +350,7 @@
   }
   .chat-brand > span {
     font-size: 10px;
-    color: #a2af93;
+    color: var(--tone-a2af93, #a2af93);
     margin-right: 20px;
   }
   .chat-layout {
@@ -290,7 +369,7 @@
   }
   .chat-catalog > p {
     font-size: 12px;
-    color: #9ba88e;
+    color: var(--tone-9ba88e, #9ba88e);
     margin: 10px 0 25px;
   }
   .chat-products {
@@ -302,31 +381,31 @@
     justify-content: flex-start;
     gap: 10px;
     padding: 14px;
-    background: #fff;
-    border: 1px solid #e7ebdf;
+    background: var(--tone-fff, #fff);
+    border: 1px solid var(--tone-e7ebdf, #e7ebdf);
     border-radius: 10px;
     text-align: right;
   }
   .product-symbol {
     width: 42px;
     height: 45px;
-    background: #f3eee3;
-    color: #c0b18d;
+    background: var(--tone-f3eee3, #f3eee3);
+    color: var(--tone-c0b18d, #c0b18d);
     display: grid;
     place-items: center;
     border-radius: 9px;
   }
   .product-symbol.sage {
-    background: #eef3e7;
-    color: #9db38c;
+    background: var(--tone-eef3e7, #eef3e7);
+    color: var(--tone-9db38c, #9db38c);
   }
   .product-symbol.rose {
-    background: #f6ebe6;
-    color: #c8a99a;
+    background: var(--tone-f6ebe6, #f6ebe6);
+    color: var(--tone-c8a99a, #c8a99a);
   }
   .product-symbol.lilac {
-    background: #efecf5;
-    color: #b3a6c8;
+    background: var(--tone-efecf5, #efecf5);
+    color: var(--tone-b3a6c8, #b3a6c8);
   }
   .chat-products strong {
     display: block;
@@ -334,21 +413,21 @@
   }
   .chat-products small {
     display: block;
-    color: #a0ae91;
+    color: var(--tone-a0ae91, #a0ae91);
     font-size: 10px;
     margin-top: 5px;
   }
   .chat-products button > :global(svg) {
     margin-right: auto;
-    color: #b1bda6;
+    color: var(--tone-b1bda6, #b1bda6);
   }
   .chat-safety {
     display: flex;
     gap: 10px;
     margin: 30px 0 24px;
     padding: 15px;
-    background: #eff3e7;
-    color: #9ba98c;
+    background: var(--tone-eff3e7, #eff3e7);
+    color: var(--tone-9ba98c, #9ba98c);
     border-radius: 9px;
   }
   .chat-safety :global(svg) {
@@ -362,8 +441,8 @@
     font-size: 10px;
   }
   .chat-window {
-    background: #fff;
-    border: 1px solid #e4eadb;
+    background: var(--tone-fff, #fff);
+    border: 1px solid var(--tone-e4eadb, #e4eadb);
     border-radius: 16px;
     display: flex;
     flex-direction: column;
@@ -371,14 +450,14 @@
     min-height: 600px;
     max-height: 1000px;
     overflow: hidden;
-    box-shadow: 0 10px 40px #42632804;
+    box-shadow: 0 10px 40px var(--tone-42632804, #42632804);
   }
   .chat-window-head {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 19px 23px;
-    border-bottom: 1px solid #edf0e6;
+    border-bottom: 1px solid var(--tone-edf0e6, #edf0e6);
   }
   .chat-window-head strong {
     font-size: 12px;
@@ -389,14 +468,14 @@
     align-items: center;
     gap: 5px;
     font-size: 9px;
-    color: #a0af91;
+    color: var(--tone-a0af91, #a0af91);
     margin-top: 4px;
   }
   .chat-window-head small i {
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: #9db585;
+    background: var(--tone-9db585, #9db585);
   }
   .chat-window-head .tag {
     margin-right: auto;
@@ -407,12 +486,12 @@
     flex: 1;
     overflow: auto;
     scroll-behavior: smooth;
-    background: linear-gradient(#fdfefa, #fff);
+    background: linear-gradient(var(--tone-fdfefa, #fdfefa), var(--tone-fff, #fff));
   }
   .chat-date {
     text-align: center;
     font-size: 9px;
-    color: #bac3ae;
+    color: var(--tone-bac3ae, #bac3ae);
     margin: 0 0 25px;
   }
   .message-wrap {
@@ -425,14 +504,14 @@
   }
   .message-bubble {
     max-width: 88%;
-    background: #eef3e6;
-    border: 1px solid #e7eddf;
+    background: var(--tone-eef3e6, #eef3e6);
+    border: 1px solid var(--tone-e7eddf, #e7eddf);
     padding: 13px 17px;
     border-radius: 12px 3px 12px 12px;
   }
   .customer .message-bubble {
-    background: #f7f4ee;
-    border: 1px solid #f0ece4;
+    background: var(--tone-f7f4ee, #f7f4ee);
+    border: 1px solid var(--tone-f0ece4, #f0ece4);
     border-radius: 3px 12px 12px 12px;
   }
   .message-bubble p {
@@ -444,7 +523,7 @@
   .message-bubble small {
     display: block;
     font-size: 8px;
-    color: #acb89e;
+    color: var(--tone-acb89e, #acb89e);
     margin-top: 8px;
     text-align: left;
   }
@@ -453,12 +532,12 @@
     gap: 10px;
     align-items: center;
     padding: 16px 19px 10px;
-    border-top: 1px solid #edf0e6;
-    background: #fff;
+    border-top: 1px solid var(--tone-edf0e6, #edf0e6);
+    background: var(--tone-fff, #fff);
   }
   .chat-compose textarea {
     border: 0;
-    background: #f7f9f2;
+    background: var(--tone-f7f9f2, #f7f9f2);
     border-radius: 10px;
     outline: none;
     font-size: 12px;
@@ -469,16 +548,16 @@
     width: 46px;
     height: 46px;
     flex-shrink: 0;
-    background: #678750;
-    color: #fff;
+    background: var(--tone-678750, #678750);
+    color: var(--tone-fff, #fff);
     border-radius: 12px;
   }
   .send-button:disabled {
-    background: #c6d3ba;
+    background: var(--tone-c6d3ba, #c6d3ba);
   }
   .compose-hint {
     font-size: 8px;
-    color: #aeb8a2;
+    color: var(--tone-aeb8a2, #aeb8a2);
     padding: 0 22px 15px;
     line-height: 1.9;
   }
@@ -492,26 +571,40 @@
     font-size: 9px;
     padding: 6px 9px;
     border-radius: 6px;
-    border: 1px solid #e6eddd;
-    background: #fbfdf7;
-    color: #95a581;
+    border: 1px solid var(--tone-e6eddd, #e6eddd);
+    background: var(--tone-fbfdf7, #fbfdf7);
+    color: var(--tone-95a581, #95a581);
   }
   .chat-summary {
-    background: #fff;
-    border: 1px solid #dce6d1;
+    background: var(--tone-fff, #fff);
+    border: 1px solid var(--tone-dce6d1, #dce6d1);
     border-radius: 12px;
     padding: 21px;
     margin: 20px 0;
     max-width: 100%;
-    box-shadow: 0 4px 18px #526e3105;
+    box-shadow: 0 4px 18px var(--tone-526e3105, #526e3105);
   }
   .summary-heading {
     display: flex;
     gap: 8px;
     align-items: center;
     margin-bottom: 20px;
-    color: #789363;
+    color: var(--tone-789363, #789363);
     font-size: 12px;
+  }
+  summary.summary-heading {
+    cursor: pointer;
+    list-style: none;
+  }
+  summary.summary-heading::-webkit-details-marker {
+    display: none;
+  }
+  summary.summary-heading > span {
+    margin-inline-start: auto;
+    font-size: 10px;
+  }
+  details.chat-summary:not([open]) .summary-heading {
+    margin-bottom: 0;
   }
   .summary-item {
     display: flex;
@@ -522,7 +615,7 @@
     line-height: 1.9;
   }
   .summary-item > span {
-    color: #a3b092;
+    color: var(--tone-a3b092, #a3b092);
     flex-shrink: 0;
   }
   .summary-item strong {
@@ -531,18 +624,18 @@
   }
   .summary-item.total {
     padding-top: 14px;
-    border-top: 1px dashed #dce6d1;
-    color: #63834c;
+    border-top: 1px dashed var(--tone-dce6d1, #dce6d1);
+    color: var(--tone-63834c, #63834c);
     margin: 18px 0 20px;
     font-size: 13px;
   }
   .summary-item.total > span {
-    color: #81966d;
+    color: var(--tone-81966d, #81966d);
   }
   .summary-missing {
     font-size: 10px;
-    color: #b39b70;
-    background: #faf5e9;
+    color: var(--tone-b39b70, #b39b70);
+    background: var(--tone-faf5e9, #faf5e9);
     padding: 10px;
     border-radius: 7px;
   }
@@ -551,7 +644,7 @@
   }
   .summary-hint {
     display: block;
-    color: #a8b69a;
+    color: var(--tone-a8b69a, #a8b69a);
     font-size: 9px;
     margin-top: 13px;
     line-height: 1.9;
@@ -568,17 +661,24 @@
     margin: 0 20px 10px;
     font-size: 10px;
   }
-  .typing {
-    display: flex;
-    gap: 4px;
-    margin: 15px;
+  .delivery-uncertain {
+    border-style: dashed;
   }
-  .typing > span {
-    width: 5px;
-    height: 5px;
-    background: #b3c2a4;
-    border-radius: 50%;
-    animation: spin 0.8s infinite;
+  .retry-actions {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .retry-actions .text-button {
+    font-size: 11px;
+    min-height: 30px;
+  }
+  .draft-hint {
+    display: block;
+    font-size: 10px;
+    color: var(--green);
+    margin-bottom: 5px;
   }
   @media (max-width: 900px) {
     .chat-layout {

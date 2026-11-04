@@ -18,7 +18,7 @@
   }
   onMount(() => {
     load();
-    const interval = setInterval(load, 10000);
+    const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
   });
   async function readAll() {
@@ -35,7 +35,8 @@
     try {
       if (!n.read) await api('/notifications/' + n.id + '/read', { method: 'POST' });
       onread();
-      if (n.order_id) navigate('/orders/' + n.order_id);
+      if (n.conversation_id) navigate('/conversations?id=' + n.conversation_id);
+      else if (n.order_id) navigate('/orders/' + n.order_id);
       else navigate('/conversations');
     } catch (e) {
       notify(e.message, true);
@@ -74,13 +75,19 @@
     <span class="spinner"></span>
   </div>{:else}<section class="panel">
     <div class="notification-list">
-      {#each shown as n}<button class="notification-item" class:unread={!n.read} onclick={() => open(n)}
+      {#each shown as n}<button
+          class="notification-item"
+          class:unread={!n.read}
+          class:urgent={n.priority === 'urgent'}
+          onclick={() => open(n)}
           ><span
             class="notification-icon"
             class:warning={n.kind.includes('overdue') || n.kind.includes('failed')}
             ><Icon name={iconFor(n.kind)} size={20} /></span
           ><span class="notification-copy"
-            ><strong>{n.text}</strong><small>{date(n.created_at, true)}</small></span
+            ><strong
+              >{#if n.priority === 'urgent'}<span class="urgent-label">فوری</span>{/if}{n.text}</strong
+            ><small>{date(n.created_at, true)}</small></span
           >{#if !n.read}<span class="unread-dot"></span>{/if}<Icon name="chevron" size={16} /></button
         >{:else}<div class="empty">
           <Icon name="bell" size={35} /><strong>اعلانی برای نمایش ندارید.</strong><span
@@ -91,11 +98,21 @@
   </section>{/if}
 
 <style>
+  .notification-item.urgent {
+    border-inline-start: 3px solid var(--red);
+  }
+  .urgent-label {
+    display: inline-block;
+    color: var(--red);
+    font-size: 11px;
+    font-weight: 600;
+    margin-inline-end: 8px;
+  }
   .notification-tabs {
     margin-bottom: 20px;
   }
   .notification-item {
-    background: #fff;
+    background: var(--tone-fff, #fff);
     width: 100%;
     display: flex;
     text-align: right;
@@ -108,21 +125,21 @@
     border-bottom: 0;
   }
   .notification-item.unread {
-    background: #fbfcf6;
+    background: var(--tone-fbfcf6, #fbfcf6);
   }
   .notification-icon {
     width: 43px;
     height: 43px;
     display: grid;
     place-items: center;
-    background: #eef3e7;
+    background: var(--tone-eef3e7, #eef3e7);
     border-radius: 12px;
-    color: #92a97c;
+    color: var(--tone-92a97c, #92a97c);
     flex-shrink: 0;
   }
   .notification-icon.warning {
-    background: #faf0e5;
-    color: #c1a379;
+    background: var(--tone-faf0e5, #faf0e5);
+    color: var(--tone-c1a379, #c1a379);
   }
   .notification-copy {
     flex: 1;
@@ -135,18 +152,18 @@
   }
   .notification-copy small {
     font-size: 9px;
-    color: #a7b298;
+    color: var(--tone-a7b298, #a7b298);
     display: block;
     margin-top: 6px;
   }
   .notification-item > :global(svg) {
-    color: #abb99e;
+    color: var(--tone-abb99e, #abb99e);
     flex-shrink: 0;
   }
   .unread-dot {
     width: 6px;
     height: 6px;
-    background: #9cb482;
+    background: var(--tone-9cb482, #9cb482);
     border-radius: 50%;
     flex-shrink: 0;
   }

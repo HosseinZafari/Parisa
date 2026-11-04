@@ -19,7 +19,7 @@
 | POST | `/chat/start` | name اختیاری | ChatState و توکن تصادفی گفتگو |
 | GET | `/chat/{token}` | توکن گفتگو | ChatState تازه |
 | POST | `/chat/{token}/messages` | text، client_id | ChatState؛ شناسهٔ پیام برای جلوگیری از تکرار |
-| GET | `/dashboard` | خصوصی | آمار، صف اولویت، هفت روز و مشتریان اخیر |
+| GET | `/dashboard` | خصوصی | آمار، صف سفارش‌ها، attention_queue و شمار گفتگوهای باز و فوری |
 | GET | `/orders` | خصوصی | خلاصهٔ سفارش‌ها |
 | POST | `/orders/quote` | خصوصی؛ Draft | مبلغ و موارد ناقص؛ بدون ثبت سفارش |
 | POST | `/orders` | خصوصی؛ OrderCreate | سفارش تأییدشده با جزئیات |
@@ -45,13 +45,16 @@
 | GET | `/customers` | خصوصی | مشتریان، شمار سفارش و مبلغ خرید |
 | GET | `/customers/{id}` | خصوصی | مشتری و سفارش‌های قبلی |
 | PATCH | `/customers/{id}` | خصوصی؛ CustomerEdit | اطلاعات و یادداشت مشتری |
-| GET | `/notifications` | خصوصی | حداکثر ۲۰۰ اعلان تازه |
+| GET | `/notifications` | خصوصی | حداکثر ۲۰۰ اعلان تازه؛ order_id یا conversation_id و priority |
 | POST | `/notifications/read-all` | خصوصی | ok |
 | POST | `/notifications/{id}/read` | خصوصی | اعلان خوانده‌شده |
-| GET | `/conversations` | خصوصی | ۱۰۰ گفتگوی اخیر و وضعیت ارجاع |
-| GET | `/conversations/{id}` | خصوصی | پیام‌ها و وضعیت تحویل |
+| GET | `/conversations` | خصوصی | حداکثر ۱۰۰ گفتگو؛ فوری‌های باز، سایر بازها و سپس گفتگوهای اخیر |
+| GET | `/conversations/{id}` | خصوصی | پیام‌های مشتری، دستیار و فروشنده به ترتیب شناسه؛ وضعیت تحویل و رسیدگی |
 | POST | `/conversations/{id}/reply` | خصوصی؛ text، resume_bot | پاسخ ذخیره‌شده و ارسال در صورت مجازبودن |
-| GET | `/settings` | خصوصی | حالت سرویس‌ها و سقف‌ها؛ بدون راز |
+| POST | `/conversations/{id}/attention` | خصوصی؛ action و resume_bot اختیاری | جزئیات گفتگو پس از resolve، reopen یا take_over |
+| GET | `/settings` | خصوصی | حالت سرویس‌ها، سقف‌ها و seller_profile؛ بدون راز |
+| PUT | `/seller/profile` | خصوصی؛ SellerProfile کامل | اطلاعات عمومی تأییدشدهٔ فروشگاه برای پاسخ به مشتری |
+| POST | `/llm/check` | خصوصی؛ حداکثر سه بار در دقیقه | آزمون صریح مدل با دادهٔ ساختگی و وضعیت امن اتصال |
 | GET | `/instagram/webhook` | query استاندارد متا | challenge یا ۴۰۳ |
 | POST | `/instagram/webhook` | X-Hub-Signature-256 | شمار رویدادهای پذیرفته‌شده |
 
@@ -61,7 +64,11 @@
 
 `Draft`: `product_id`، `quantity`، `specifications` (نگاشت کلیدهای کاتالوگ به رشته)، `delivery`، `deadline` اختیاری و `delivery_confirmed`. برای ثبت مستقیم سفارش، `customer_id` نیز لازم است. فیلدهای delivery عبارت‌اند از `name`، `phone`، `address`، `city`، `postal_code` و `notes`. نام، شمارهٔ معتبر ایرانی، شهر، نشانی حداقل ۱۰ نویسه و کد پستی ۱۰ رقمی الزامی هستند.
 
-`ChatState`: `token`، `messages`، `draft`، `summary`، `ready_to_confirm`، `order`، `payment`، `tracking_url` و `handover`. خلاصه حاوی محصول، تعداد، مشخصات، نشانی، قیمت واحد، جمع، ارسال، کل، موعد و `missing` است. پیش از تأیید order برابر null است.
+`ChatState`: `token`، `messages`، `draft`، `summary`، `ready_to_confirm`، `suggested_replies`، `order`، `payment`، `tracking_url` و `handover`. پیشنهادهای پاسخ از گزینه‌های واقعی آخرین مشخصهٔ پرسیده‌شده می‌آیند. خلاصه حاوی محصول، تعداد، مشخصات، نشانی، قیمت واحد، جمع، ارسال، کل، موعد و `missing` است. پیش از تأیید order برابر null است.
+
+`SellerProfile`: `store_name`، `about`، `contact`، `working_hours`، `shipping_policy`، `return_policy`، `custom_orders` و `ordering_help`. این اطلاعات برای مشتری قابل استفاده است؛ کلید سرویس و یادداشت خصوصی در آن قرار ندهید. مقدار خالی یعنی اطلاعات ثبت نشده؛ سیستم برای آن ساعت کاری یا سیاست فروش نمی‌سازد.
+
+وضعیت رسیدگی گفتگو از وضعیت سفارش جداست: `attention_status` یکی از `none/open/resolved`، `attention_priority` یکی از `normal/urgent`، به همراه `handover_reason` و زمان و مسئول آخرین رسیدگی. `resolve` درخواست را می‌بندد؛ فقط با `resume_bot=true` پاسخ خودکار فعال می‌شود. `reopen` و `take_over` درخواست را باز و دستیار را متوقف می‌کنند. خواندن اعلان به‌تنهایی درخواست رسیدگی را نمی‌بندد. هر چرخهٔ رسیدگی و ارتقای آن به فوری، اعلان یکتای مرتبط با گفتگو دارد.
 
 `OrderDetail`: خلاصهٔ سفارش به همراه `version`، `delivery`، `specifications`، `requirement_schema`، `payments`، `changes`، `messages`، `history`، `notifications`، یادداشت خصوصی، پیام مشتری و `shipping_blocks`. تغییر بعدی باید version همین پاسخ را بفرستد. `allowed_statuses` گذارهای انتخابی مجاز را می‌دهد؛ تأیید پرداخت و ارسال مسیر اختصاصی دارند.
 

@@ -82,9 +82,18 @@ def event(db, order, kind, text, actor="سامانه", details=None):
     db.add(OrderHistory(order_id=order.id, kind=kind, text=text, actor=actor, details=details or {}))
 
 
-def notify(db, order, kind, text, key):
+def notify(db, order, kind, text, key, *, conversation=None, priority="normal"):
     if not db.scalar(select(Notification).where(Notification.dedupe_key == key)):
-        db.add(Notification(order_id=order.id if order else None, kind=kind, text=text, dedupe_key=key))
+        db.add(
+            Notification(
+                order_id=order.id if order else None,
+                kind=kind,
+                text=text,
+                dedupe_key=key,
+                conversation_id=conversation.id if conversation else None,
+                priority=priority,
+            )
+        )
         db.flush()
 
 
@@ -667,6 +676,8 @@ def notification_data(n):
     return {
         "id": n.id,
         "order_id": n.order_id,
+        "conversation_id": n.conversation_id,
+        "priority": n.priority,
         "kind": n.kind,
         "text": n.text,
         "read": n.read,
@@ -747,6 +758,8 @@ def deadline_notifications(db):
 
 
 def dashboard(db):
+    from .support import attention_queue
+
     deadline_notifications(db)
     orders = [order_data(db, o) for o in db.scalars(select(Order).order_by(Order.id.desc()))]
     active = [o for o in orders if o["status"] not in {"shipped", "canceled"}]
@@ -778,6 +791,7 @@ def dashboard(db):
             }
         )
     return {
+        **attention_queue(db),
         "total_orders": len(orders),
         "total_customers": len(rows(db, Customer)),
         "paid_total": sum(p.amount for p in db.scalars(select(Payment).where(Payment.status == "success"))),

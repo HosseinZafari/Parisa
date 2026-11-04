@@ -18,6 +18,8 @@ def env(tmp_path, monkeypatch):
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
     limiter.buckets.clear()
     config = settings()
+    monkeypatch.setattr("app.llm_status._state", {"status": "not_checked", "checked_at": None, "http_status": None})
+    monkeypatch.setattr("app.llm_status._retry_at", 0.0)
     monkeypatch.setattr(config, "llm_mode", "mock")
     monkeypatch.setattr(config, "instagram_mode", "mock")
     monkeypatch.setattr(config, "instagram_app_secret", "test-instagram-secret")

@@ -199,7 +199,7 @@
   .customer-hero p {
     text-align: right;
     font-size: 12px;
-    color: #a1b090;
+    color: var(--tone-a1b090, #a1b090);
   }
   .notes {
     white-space: pre-wrap;

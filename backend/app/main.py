@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import delete, select, text
+from sqlalchemy import case, delete, select, text
 
 from . import schemas as s
 from . import responses as r
@@ -50,6 +50,9 @@ from .domain import (
 )
 from .instagram import ingest_webhook, verify_signature, worker
 from .llm import match_products
+from .llm import check_connection
+from .llm_status import connection_status
+from .support import attention_data, request_attention, resolve_attention, seller_profile
 from .models import (
     ChangeRequest,
     Conversation,
@@ -251,6 +254,13 @@ def get_dashboard(seller=Depends(require_seller), db=Depends(get_db)):
 @app.get("/api/settings", response_model=r.SettingsResponse, tags=["تنظیمات"])
 def get_settings(seller=Depends(require_seller)):
     return {
+        "llm_connection": connection_status(),
+        "seller_profile": s.SellerProfile.model_validate(
+            {
+                **(seller.public_profile or {}),
+                "store_name": (seller.public_profile or {}).get("store_name") or seller.name,
+            }
+        ).model_dump(),
         "llm_mode": config.llm_mode,
         "llm_model": config.llm_model if config.llm_mode == "api" else None,
         "instagram_mode": config.instagram_mode,
@@ -262,6 +272,24 @@ def get_settings(seller=Depends(require_seller)):
         "max_conversation_messages": config.max_conversation_messages,
         "max_llm_requests": config.max_llm_requests,
     }
+
+
+@app.post("/api/llm/check", response_model=r.LLMConnectionStatus, tags=["تنظیمات"])
+def test_llm_connection(request: Request, seller=Depends(require_seller)):
+    limiter.check("llm-check:" + str(seller.id), 3)
+    return check_connection()
+
+
+@app.put("/api/seller/profile", response_model=s.SellerProfile, tags=["تنظیمات"])
+def update_seller_profile(
+    body: s.SellerProfile, key=Depends(key_required), seller=Depends(require_seller), db=Depends(get_db)
+):
+    def action():
+        seller.public_profile = body.model_dump()
+        db.flush()
+        return seller_profile(db)
+
+    return mutate(db, "seller:profile", key, body.model_dump(), action)
 
 
 @app.get("/api/orders", response_model=list[r.OrderSummary], tags=["سفارش"])
@@ -607,11 +635,23 @@ def read_notification(notification_id: int, seller=Depends(require_seller), db=D
 @app.get("/api/conversations", response_model=list[r.ConversationSummary], tags=["گفتگوهای فروشنده"])
 def conversations(seller=Depends(require_seller), db=Depends(get_db)):
     result = []
-    for c in db.scalars(select(Conversation).order_by(Conversation.updated_at.desc()).limit(100)):
+    for c in db.scalars(
+        select(Conversation)
+        .order_by(
+            case(
+                ((Conversation.attention_status == "open") & (Conversation.attention_priority == "urgent"), 0),
+                (Conversation.attention_status == "open", 1),
+                else_=2,
+            ),
+            Conversation.updated_at.desc(),
+        )
+        .limit(100)
+    ):
         customer = db.get(Customer, c.customer_id)
         latest = db.scalar(select(Message).where(Message.conversation_id == c.id).order_by(Message.id.desc()))
         result.append(
             {
+                **attention_data(c),
                 "id": c.id,
                 "customer_name": customer.name,
                 "customer_username": customer.username,
@@ -630,6 +670,7 @@ def conversations(seller=Depends(require_seller), db=Depends(get_db)):
 def conversation_detail(conversation_id: int, seller=Depends(require_seller), db=Depends(get_db)):
     c = get_or_404(db, Conversation, conversation_id)
     return {
+        **attention_data(c),
         "id": c.id,
         "handover": c.handover,
         "order_id": c.order_id,
@@ -641,7 +682,7 @@ def conversation_detail(conversation_id: int, seller=Depends(require_seller), db
                 "delivery_status": m.delivery_status,
                 "created_at": iso(m.created_at),
             }
-            for m in rows(db, Message, conversation_id=c.id)
+            for m in db.scalars(select(Message).where(Message.conversation_id == c.id).order_by(Message.id))
         ],
     }
 
@@ -657,6 +698,8 @@ def reply(
     def action():
         c = get_or_404(db, Conversation, conversation_id)
         c.handover = not body.resume_bot
+        if body.resume_bot:
+            resolve_attention(db, c, seller, resume_bot=True)
         c.updated_at = now()
         db.add(
             Message(
@@ -670,6 +713,28 @@ def reply(
         return {"ok": True}
 
     return mutate(db, f"conversation:{conversation_id}:reply", key, body.model_dump(), action)
+
+
+@app.post(
+    "/api/conversations/{conversation_id}/attention", response_model=r.ConversationDetail, tags=["گفتگوهای فروشنده"]
+)
+def manage_conversation_attention(
+    conversation_id: int,
+    body: s.AttentionAction,
+    key=Depends(key_required),
+    seller=Depends(require_seller),
+    db=Depends(get_db),
+):
+    def action():
+        c = get_or_404(db, Conversation, conversation_id)
+        if body.action == "resolve":
+            resolve_attention(db, c, seller, resume_bot=body.resume_bot)
+        else:
+            request_attention(db, c, s.SupportSignal(reason="گفتگو برای رسیدگی فروشنده باز شد."))
+        db.flush()
+        return conversation_detail(conversation_id, seller=seller, db=db)
+
+    return mutate(db, f"conversation:{conversation_id}:attention", key, body.model_dump(), action)
 
 
 @app.get("/api/instagram/webhook", tags=["اینستاگرام"])

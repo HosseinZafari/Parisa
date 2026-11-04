@@ -1,0 +1,252 @@
+/* سلسله‌مراتب بصری میز کار؛ جزئیات ثانویه با درخواست کاربر باز می‌شوند. */
+.dashboard-view {
+  --muted: #687a6b;
+}
+.dashboard-view .page-heading {
+  margin-bottom: 30px;
+}
+.dashboard-view .eyebrow {
+  display: none;
+}
+.dashboard-view .page-heading p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.dashboard-view .greeting-leaf {
+  display: none;
+}
+.dashboard-view .stats-grid {
+  gap: 16px;
+}
+.dashboard-view .stat-card {
+  padding: 20px 22px;
+  box-shadow: none;
+}
+.dashboard-view .stat-card:hover {
+  transform: none;
+}
+.dashboard-view .stat-top > span:first-child {
+  font-size: 12px;
+  color: var(--muted);
+}
+.dashboard-view .stat-icon {
+  background: transparent;
+  width: 25px;
+  height: 25px;
+  color: var(--muted);
+}
+.dashboard-view .stat-card > strong {
+  font-size: 30px;
+  margin: 14px 0;
+}
+.dashboard-view .stat-card > strong small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.dashboard-view .stat-bottom {
+  font-size: 11px;
+  color: var(--muted);
+}
+.dashboard-view .stat-card.income {
+  background: var(--paper);
+  border-color: var(--line);
+}
+.dashboard-view .stat-card > .money-stat {
+  font-size: 25px;
+  color: var(--green);
+}
+.dashboard-view .attention-strip {
+  margin-block: 24px;
+  padding: 18px 22px;
+}
+.dashboard-view .attention-copy strong {
+  font-size: 13px;
+  color: #806333;
+}
+.dashboard-view .attention-copy p {
+  font-size: 12px;
+  color: #806c48;
+}
+.dashboard-view .attention-strip > .text-button {
+  font-size: 12px;
+  color: #806333;
+}
+.dashboard-view .queue-panel .panel-head {
+  padding: 26px 24px 20px;
+}
+.dashboard-view .panel-head h2 {
+  font-size: 18px;
+}
+.dashboard-view .panel-head p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.dashboard-view .sort-label {
+  display: none;
+}
+.dashboard-view .queue-tabs {
+  padding-bottom: 20px;
+}
+.dashboard-view .tab {
+  min-height: 40px;
+  font-size: 12px;
+}
+.dashboard-view .order-table th {
+  font-size: 12px;
+  color: var(--muted);
+  padding-block: 16px;
+}
+.dashboard-view .order-table td {
+  padding-block: 21px;
+}
+.dashboard-view .customer-cell strong,
+.dashboard-view .product-cell {
+  font-size: 13px;
+}
+.dashboard-view .order-table small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.dashboard-view .status-badge {
+  font-size: 11px;
+}
+.dashboard-view .deadline,
+.dashboard-view .action-link {
+  font-size: 12px;
+}
+.dashboard-view .action-link {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.dashboard-view .table-footer {
+  font-size: 11px;
+  padding-block: 18px;
+}
+.dashboard-insights {
+  margin-top: 28px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.dashboard-insights > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 0;
+}
+.dashboard-insights > summary::-webkit-details-marker {
+  display: none;
+}
+.dashboard-insights summary strong {
+  font-size: 15px;
+}
+.dashboard-insights summary small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.insights-toggle {
+  font-size: 12px;
+  color: var(--green);
+  border: 1px solid var(--line);
+  padding: 9px 14px;
+  border-radius: 8px;
+}
+.dashboard-insights[open] .insights-toggle::after {
+  content: ' −';
+}
+.dashboard-insights[open] .when-closed,
+.dashboard-insights:not([open]) .when-open {
+  display: none;
+}
+.dashboard-insights:not([open]) .insights-toggle::after {
+  content: ' +';
+}
+.dashboard-view .dashboard-bottom {
+  grid-template-columns: 1.4fr 1fr;
+}
+.dashboard-view .recent-panel {
+  grid-column: 1/-1;
+}
+.dashboard-view .recent-list {
+  grid-template-columns: repeat(4, 1fr);
+}
+.app-shell .little-note {
+  display: none;
+}
+.app-shell nav a {
+  font-size: 13px;
+}
+.theme-toggle {
+  min-width: 80px;
+}
+.theme-toggle > span {
+  font-size: 18px;
+}
+:root[data-theme='dark'] .dashboard-view {
+  --muted: #afc0b3;
+}
+:root[data-theme='dark'] .dashboard-view .attention-copy strong,
+:root[data-theme='dark'] .dashboard-view .attention-copy p,
+:root[data-theme='dark'] .dashboard-view .attention-strip > .text-button {
+  color: #ebca92;
+}
+@media (max-width: 700px) {
+  .dashboard-view .stat-card {
+    padding: 17px 14px;
+  }
+  .dashboard-view .stat-top > span:first-child {
+    font-size: 11px;
+  }
+  .dashboard-view .stat-bottom {
+    font-size: 10px;
+  }
+  .dashboard-view .stat-card > .money-stat {
+    font-size: 21px;
+  }
+  .dashboard-view .attention-strip {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dashboard-view .attention-strip > .text-button {
+    max-width: none;
+    align-self: flex-start;
+  }
+  .dashboard-view .mobile-order {
+    padding: 22px 17px;
+  }
+  .dashboard-view .mobile-order-head .status-badge {
+    font-size: 10px;
+  }
+  .dashboard-view .mobile-order .customer-cell strong {
+    font-size: 13px;
+  }
+  .dashboard-view .mobile-product {
+    font-size: 12px;
+  }
+  .dashboard-view .mobile-order-foot .btn {
+    font-size: 11px;
+  }
+  .dashboard-view .dashboard-bottom {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-view .recent-list {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dashboard-insights summary small {
+    max-width: 210px;
+    font-size: 11px;
+  }
+  .insights-toggle {
+    font-size: 11px;
+    white-space: nowrap;
+    padding: 8px;
+  }
+  .app-shell .topbar-date {
+    display: none;
+  }
+}

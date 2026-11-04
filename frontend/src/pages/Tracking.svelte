@@ -96,14 +96,14 @@
     align-items: center;
     gap: 8px;
     flex: 1;
-    color: #bac4ad;
+    color: var(--tone-bac4ad, #bac4ad);
     position: relative;
   }
   .tracking-progress > div:before {
     content: '';
     position: absolute;
     height: 1px;
-    background: #e4ebdc;
+    background: var(--tone-e4ebdc, #e4ebdc);
     left: 70%;
     right: -30%;
     top: 18px;
@@ -116,17 +116,17 @@
     place-items: center;
     width: 38px;
     height: 38px;
-    border: 1px solid #e2ead9;
+    border: 1px solid var(--tone-e2ead9, #e2ead9);
     border-radius: 50%;
-    background: #f9fbf5;
+    background: var(--tone-f9fbf5, #f9fbf5);
     z-index: 1;
   }
   .tracking-progress .done {
-    color: #789565;
+    color: var(--tone-789565, #789565);
   }
   .tracking-progress .done span {
-    background: #eaf1e2;
-    border-color: #cdddc0;
+    background: var(--tone-eaf1e2, #eaf1e2);
+    border-color: var(--tone-cdddc0, #cdddc0);
   }
   .tracking-progress small {
     font-size: 9px;
@@ -140,10 +140,10 @@
     align-items: center;
     gap: 13px;
     padding: 19px;
-    background: #edf4e5;
+    background: var(--tone-edf4e5, #edf4e5);
     border-radius: 10px;
     margin-top: 25px;
-    color: #799762;
+    color: var(--tone-799762, #799762);
   }
   .parcel strong {
     font-size: 12px;
@@ -154,6 +154,6 @@
   }
   .parcel small {
     font-size: 9px;
-    color: #a4b395;
+    color: var(--tone-a4b395, #a4b395);
   }
 </style>

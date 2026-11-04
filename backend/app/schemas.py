@@ -92,8 +92,50 @@ class Draft(StrictModel):
         return value
 
 
+class CatalogQuestion(StrictModel):
+    topic: Literal[
+        "options",
+        "details",
+        "price",
+        "shipping",
+        "preparation",
+        "product",
+        "field_help",
+        "seller",
+        "policy",
+        "availability",
+    ]
+    field: str | None = Field(default=None, max_length=100)
+
+
+class SupportSignal(StrictModel):
+    priority: Literal["normal", "urgent"] = "normal"
+    reason: str = Field(min_length=1, max_length=500)
+    category: Literal["human_request", "safety", "payment_problem", "delivery_problem", "complaint", "other"] = (
+        "human_request"
+    )
+
+
+class SellerProfile(StrictModel):
+    store_name: str = Field(default="", max_length=200)
+    about: str = Field(default="", max_length=1500)
+    contact: str = Field(default="", max_length=500)
+    working_hours: str = Field(default="", max_length=500)
+    shipping_policy: str = Field(default="", max_length=1500)
+    return_policy: str = Field(default="", max_length=1500)
+    custom_orders: str = Field(default="", max_length=1000)
+    ordering_help: str = Field(default="", max_length=1500)
+
+
+class AttentionAction(StrictModel):
+    action: Literal["resolve", "reopen", "take_over"]
+    resume_bot: bool = False
+
+
 class Extraction(StrictModel):
-    intent: Literal["order", "correct", "confirm", "change", "handover", "repeat", "new", "other"] = "order"
+    intent: Literal["order", "correct", "confirm", "change", "handover", "repeat", "new", "question", "other"] = "order"
+    questions: list[CatalogQuestion] = Field(default_factory=list, max_length=5)
+    support: SupportSignal | None = None
     product_id: int | None = Field(default=None, ge=1)
     quantity: int | None = Field(default=None, ge=1, le=1000)
     specifications: dict[str, str] = Field(default_factory=dict)

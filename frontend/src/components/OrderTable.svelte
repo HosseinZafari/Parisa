@@ -112,7 +112,7 @@
       border-top: 1px solid var(--line);
     }
     .mobile-order.late {
-      background: #fffcf8;
+      background: var(--tone-fffcf8, #fffcf8);
     }
     .mobile-order-head {
       display: flex;
@@ -129,7 +129,7 @@
     .customer-cell small {
       display: block;
       font-size: 9px;
-      color: #a0ad94;
+      color: var(--tone-a0ad94, #a0ad94);
       margin-top: 4px;
     }
     .mobile-order-head :global(.status-badge) {
@@ -141,11 +141,11 @@
       justify-content: space-between;
       gap: 10px;
       font-size: 10px;
-      color: #8c9c7b;
+      color: var(--tone-8c9c7b, #8c9c7b);
       margin: 18px 0;
     }
     .mobile-product > span:last-child {
-      color: #a8b39a;
+      color: var(--tone-a8b39a, #a8b39a);
       font-size: 9px;
     }
     .mobile-order-foot {

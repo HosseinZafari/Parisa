@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from .schemas import Draft, RequirementInput
+from .schemas import Draft, RequirementInput, SellerProfile
 
 
 OrderStatus = Literal[
@@ -113,6 +113,8 @@ class ChangeQuote(BaseModel):
 
 
 class NotificationResponse(BaseModel):
+    conversation_id: int | None = None
+    priority: Literal["normal", "urgent"] = "normal"
     id: int
     order_id: int | None
     kind: str
@@ -213,6 +215,7 @@ class Tracking(BaseModel):
 
 
 class ChatState(BaseModel):
+    suggested_replies: list[str] = Field(default_factory=list)
     token: str
     handover: bool
     channel: str
@@ -253,7 +256,18 @@ class RecentCustomer(Identity):
     last_interaction_at: str
 
 
+class ConversationTask(BaseModel):
+    conversation_id: int
+    customer_name: str
+    priority: Literal["normal", "urgent"]
+    reason: str
+    updated_at: str
+
+
 class Dashboard(BaseModel):
+    attention_queue: list[ConversationTask] = Field(default_factory=list)
+    pending_conversations: int = 0
+    urgent_conversations: int = 0
     total_orders: int
     total_customers: int
     paid_total: int
@@ -272,7 +286,18 @@ class TrackingLink(BaseModel):
     tracking_url: str | None
 
 
+class LLMConnectionStatus(BaseModel):
+    status: str
+    message: str
+    model: str | None
+    checked_at: str | None
+    http_status: int | None
+    retry_after_seconds: int
+
+
 class SettingsResponse(BaseModel):
+    seller_profile: SellerProfile = Field(default_factory=SellerProfile)
+    llm_connection: LLMConnectionStatus
     llm_mode: Literal["mock", "api"]
     llm_model: str | None
     instagram_mode: Literal["mock", "live"]
@@ -285,7 +310,15 @@ class SettingsResponse(BaseModel):
     max_llm_requests: int
 
 
-class ConversationSummary(BaseModel):
+class AttentionFields(BaseModel):
+    attention_status: Literal["none", "open", "resolved"] = "none"
+    attention_priority: Literal["normal", "urgent"] = "normal"
+    handover_reason: str = ""
+    attention_resolved_at: str | None = None
+    attention_resolved_by: str | None = None
+
+
+class ConversationSummary(AttentionFields):
     id: int
     customer_name: str
     customer_username: str
@@ -301,7 +334,7 @@ class DeliveryMessage(MessageResponse):
     delivery_status: str
 
 
-class ConversationDetail(BaseModel):
+class ConversationDetail(AttentionFields):
     id: int
     handover: bool
     order_id: int | None

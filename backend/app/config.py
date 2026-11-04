@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,10 +19,12 @@ class Settings(BaseSettings):
     seller_username: str = "parisa"
     seller_password: str = "parisa-demo-1405"
     llm_mode: Literal["mock", "api"] = "mock"
-    llm_api_key: str = ""
+    llm_api_key: str = Field(default="", repr=False)
     llm_base_url: str = "https://api.openai.com/v1"
     llm_model: str = "gpt-4.1-mini"
     llm_timeout_seconds: int = 20
+    llm_max_output_tokens: int = Field(default=1536, ge=128, le=8192)
+    llm_retry_cooldown_seconds: int = Field(default=60, ge=1, le=300)
     max_message_length: int = 2000
     max_conversation_messages: int = 160
     max_llm_requests: int = 40
@@ -41,6 +43,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def deployment_secrets(self):
+        if self.llm_model.startswith("opencode-go/") and "/inference/go/" not in self.llm_base_url:
+            raise ValueError("مدل OpenCode Go باید به نشانی اشتراکی /inference/go/ متصل شود.")
         if self.app_env == "aws":
             if not self.cookie_secure or not self.public_base_url.startswith("https://"):
                 raise ValueError("استقرار نیازمند نشانی HTTPS و کوکی امن است.")
@@ -68,6 +72,10 @@ class Settings(BaseSettings):
         ):
             raise ValueError("تنظیمات اتصال اینستاگرام کامل نیست.")
         return self
+
+    @property
+    def llm_request_model(self):
+        return self.llm_model.removeprefix("opencode-go/")
 
     @property
     def origins(self):

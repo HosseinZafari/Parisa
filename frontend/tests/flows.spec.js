@@ -1,5 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+test('حالت روشن و تاریک و دسترسی به آمار تکمیلی', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await login(page);
+  await expect(page.locator('.dashboard-insights')).not.toHaveAttribute('open', '');
+  await page.getByRole('button', { name: 'فعال کردن حالت تاریک', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'فعال کردن حالت روشن', exact: true })).toBeVisible();
+  await page.locator('.dashboard-insights summary').click();
+  await expect(page.getByRole('heading', { name: 'نبض این هفته', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'فعال کردن حالت روشن', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
 async function login(page) {
   await page.goto('/dashboard');
   await expect(

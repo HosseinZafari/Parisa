@@ -9,8 +9,8 @@ from .domain import (
     create_change,
     create_order,
     get_or_404,
+    item_for,
     iso,
-    notify,
     payment_data,
     payment_link,
     product_data,
@@ -24,6 +24,9 @@ from .domain import (
 from .llm import extract, match_products
 from .models import Conversation, Customer, Message, Order, Product, now
 from .schemas import Draft
+from .chat_knowledge import answer_questions, field_prompt, requirement_prompt, normalize_text
+from .support import detect_support, request_attention, seller_profile
+from .schemas import SupportSignal
 
 
 def draft_data(conversation):
@@ -75,12 +78,28 @@ def chat_state(db, conv):
         "draft": draft,
         "summary": summary if not conv.order_id else None,
         "ready_to_confirm": bool(conv.draft.get("_ready")) and not conv.order_id,
+        "suggested_replies": suggested_replies(db, conv),
         "order": tracking_data(db, db.get(Order, conv.order_id)) if conv.order_id else None,
         "tracking_url": f"{settings().public_base_url}/track/{db.get(Order, conv.order_id).tracking_token}"
         if conv.order_id and db.get(Order, conv.order_id).tracking_token
         else None,
         "payment": _active_payment(db, conv),
     }
+
+
+def suggested_replies(db, conv):
+    if conv.handover or conv.draft.get("_ready"):
+        return []
+    asked = conv.draft.get("_change_asked" if conv.order_id else "_asked", "") or ""
+    if not asked.startswith("specifications.") or not conv.draft.get("product_id"):
+        return []
+    product = db.get(Product, conv.draft["product_id"])
+    if not product or not product.enabled:
+        return []
+    requirement = next(
+        (r for r in product_data(db, product)["requirements"] if r["key"] == asked.split(".", 1)[1]), None
+    )
+    return requirement["allowed_values"][:6] if requirement else []
 
 
 def _active_payment(db, conv):
@@ -105,8 +124,7 @@ def ask_missing(db, draft, products):
     for r in product["requirements"]:
         value = draft["specifications"].get(r["key"])
         if (r["required"] and not value) or (value and r["allowed_values"] and value not in r["allowed_values"]):
-            options = " انتخاب‌ها: " + "، ".join(r["allowed_values"]) if r["allowed_values"] else ""
-            return "specifications." + r["key"], f"{r['label']} را مشخص کنید.{options}"
+            return "specifications." + r["key"], requirement_prompt(product, r)
     from .domain import delivery_missing
 
     missing = delivery_missing(draft["delivery"])
@@ -118,9 +136,7 @@ def ask_missing(db, draft, products):
                 or (key == "postal_code" and "کد پستی ۱۰ رقمی" in missing)
                 or (key == "address" and "نشانی دقیق شامل خیابان و پلاک" in missing)
             ):
-                return f"delivery.{key}", f"لطفاً {label} را بفرستید." + (
-                    " کد پستی باید ۱۰ رقم باشد." if key == "postal_code" else ""
-                )
+                return f"delivery.{key}", field_prompt(f"delivery.{key}", product)
     q = quote(db, draft)
     if q["missing"]:
         return "deadline", "لطفاً این موارد را روشن کنید: " + "، ".join(q["missing"])
@@ -157,11 +173,23 @@ def process_message(db, conv, text, client_id, external_id=None):
     draft = snapshot(db, db.get(Order, conv.order_id)) if conv.order_id else draft_data(conv)
     result = None
     fallback = False
-    if conv.handover:
+    signal = detect_support(text)
+    if signal:
+        reply = request_attention(db, conv, signal)
+    elif conv.handover:
+        if conv.attention_status != "open":
+            request_attention(db, conv, SupportSignal(reason="پیام تازهٔ مشتری نیازمند پاسخ فروشنده است."))
         reply = "پیام شما برای فروشنده ذخیره شد؛ پاسخ را همین‌جا دریافت می‌کنید."
+        # توقف پاسخ‌گویی خودکار، تشخیص یک مشکل تازه و جدی را متوقف نمی‌کند.
+        try:
+            classified, _ = extract(text, products, draft, history, conv, seller_info=seller_profile(db))
+            if classified.support and classified.support.priority == "urgent":
+                reply = request_attention(db, conv, classified.support)
+        except (ValueError, TypeError):
+            pass
     else:
         try:
-            result, fallback = extract(text, products, draft, history, conv)
+            result, fallback = extract(text, products, draft, history, conv, seller_info=seller_profile(db))
         except (ValueError, TypeError):
             reply = (
                 "این مقدار روشن نیست. لطفاً تعداد یا تاریخ را دقیق‌تر بنویسید؛ برای کمک می‌توانید «فروشنده» را بفرستید."
@@ -180,18 +208,78 @@ def process_message(db, conv, text, client_id, external_id=None):
     return state
 
 
+def canonical_field(key, product):
+    if key in {"name", "phone", "address", "city", "postal_code", "notes"}:
+        return "delivery." + key
+    if product and key in {r["key"] for r in product["requirements"]}:
+        return "specifications." + key
+    return key
+
+
+def uncertainty_question(uncertain, product):
+    return field_prompt(sorted(uncertain)[0], product, uncertain=True)
+
+
 def apply_extraction(db, conv, customer, draft, result, products, text):
-    if result.intent == "handover":
-        conv.handover = True
-        order = db.get(Order, conv.order_id) if conv.order_id else None
-        notify(
-            db,
-            order,
-            "handover",
-            f"{customer.name} درخواست گفتگو با فروشنده دارد.",
-            f"handover:{conv.id}:{len(rows(db, Message, conversation_id=conv.id))}",
+    if result.support:
+        return request_attention(db, conv, result.support)
+    product = next((p for p in products if p["id"] == (result.product_id or draft.get("product_id"))), None)
+    if conv.order_id and product and result.intent not in {"new", "handover"}:
+        change_help = clarify_order_change(db, conv, draft, result, product, text)
+        if change_help:
+            return change_help
+    if result.intent == "question":
+        uncertain = {canonical_field(k, product) for k in conv.draft.get("_uncertain", [])}
+        confirmed_price = None
+        if conv.order_id and product and product["id"] == draft.get("product_id"):
+            order = db.get(Order, conv.order_id)
+            confirmed_price = {
+                "unit_price": item_for(db, order).unit_price,
+                "shipping_cost": order.shipping_cost,
+                "total": order.total,
+            }
+        reply, covered = answer_questions(
+            result.questions,
+            product,
+            draft,
+            uncertain=uncertain,
+            asked=conv.draft.get("_asked"),
+            confirmed_price=confirmed_price,
+            seller_info=seller_profile(db),
+            catalog=products,
         )
-        return "گفتگو به فروشنده واگذار شد. پیام بعدی شما نیز برای او ذخیره می‌شود."
+        if not conv.order_id and product and product["id"] == draft.get("product_id"):
+            try:
+                asked, followup = (
+                    (sorted(uncertain)[0], uncertainty_question(uncertain, product))
+                    if uncertain
+                    else ask_missing(db, draft, products)
+                )
+                if asked and asked not in covered:
+                    reply += "\n\nبرای ادامهٔ سفارشت: " + followup
+            except HTTPException:
+                pass
+        return reply
+    reply = _apply_extraction(db, conv, customer, draft, result, products, text)
+    if result.questions:
+        updated = snapshot(db, db.get(Order, conv.order_id)) if conv.order_id else draft_data(conv)
+        product = next((p for p in products if p["id"] == updated.get("product_id")), product)
+        answer, covered = answer_questions(
+            result.questions,
+            product,
+            updated,
+            uncertain=conv.draft.get("_uncertain", []),
+            asked=conv.draft.get("_asked"),
+            seller_info=seller_profile(db),
+            catalog=products,
+        )
+        return answer if conv.draft.get("_asked") in covered else answer + "\n\n" + reply
+    return reply
+
+
+def _apply_extraction(db, conv, customer, draft, result, products, text):
+    if result.intent == "handover":
+        return request_attention(db, conv, SupportSignal(reason="مشتری درخواست پاسخ مستقیم فروشنده دارد."))
     if result.intent == "new":
         conv.order_id, conv.draft = None, {}
         return "سفارش تازه را شروع کنیم؛ نام محصول و تعداد را بفرستید."
@@ -206,23 +294,31 @@ def apply_extraction(db, conv, customer, draft, result, products, text):
         conv.draft = data
         return "اطلاعات سفارش قبلی بازیابی شد. مشخصات و نشانی را تأیید یا اصلاح کنید؛ هیچ پرداختی بدون تأیید تازه ایجاد نمی‌شود."
     extracted = result.model_dump()
+    selected_product = next((p for p in products if p["id"] == (result.product_id or draft.get("product_id"))), None)
+    current_uncertain = {canonical_field(k, selected_product) for k in result.uncertain_fields}
     patch = {}
-    if result.product_id:
+    if result.product_id and "product_id" not in current_uncertain:
         patch["product_id"] = result.product_id
-    if result.quantity:
+    if result.quantity and "quantity" not in current_uncertain:
         patch["quantity"] = result.quantity
     if result.specifications:
-        patch["specifications"] = result.specifications
-    delivered = {k: v for k, v in extracted["delivery"].items() if v}
+        patch["specifications"] = {
+            k: v for k, v in result.specifications.items() if "specifications." + k not in current_uncertain
+        }
+    delivered = {k: v for k, v in extracted["delivery"].items() if v and "delivery." + k not in current_uncertain}
     if delivered:
         patch["delivery"] = delivered
-    if result.deadline:
+    if result.deadline and "deadline" not in current_uncertain:
         patch["deadline"] = result.deadline
     if conv.order_id:
+        if current_uncertain:
+            conv.draft = {**conv.draft, "_change_asked": sorted(current_uncertain)[0]}
+            return uncertainty_question(current_uncertain, selected_product)
         order = get_or_404(db, Order, conv.order_id)
         if patch:
             try:
                 change = create_change(db, order, patch)
+                conv.draft = {k: v for k, v in conv.draft.items() if k != "_change_asked"}
                 return (
                     "درخواست تغییر برای پیگیری دستی به فروشنده رسید."
                     if change.status == "manual"
@@ -258,21 +354,23 @@ def apply_extraction(db, conv, customer, draft, result, products, text):
     proposed_specs = {**conv.draft.get("_unassigned_specs", {}), **patch.get("specifications", {})}
     new["specifications"] = {
         **new["specifications"],
-        **{k: v for k, v in proposed_specs.items() if k in allowed_keys and k not in result.uncertain_fields},
+        **{
+            k: v
+            for k, v in proposed_specs.items()
+            if k in allowed_keys and "specifications." + k not in current_uncertain
+        },
     }
     new["delivery"] = {**new["delivery"], **delivered}
-    if result.deadline:
-        new["deadline"] = result.deadline
+    if "deadline" in patch:
+        new["deadline"] = patch["deadline"]
     new = Draft.model_validate(new).model_dump()
-    previous_uncertain = set(conv.draft.get("_uncertain", []))
-    resolved = set(patch.get("specifications", {})) | set(delivered) | ({"deadline"} if result.deadline else set())
-    uncertain = (previous_uncertain - resolved) | set(result.uncertain_fields)
+    previous_uncertain = {canonical_field(k, product) for k in conv.draft.get("_uncertain", [])}
+    resolved = {"specifications." + k for k in patch.get("specifications", {})} | {"delivery." + k for k in delivered}
+    resolved |= {k for k in ("quantity", "product_id", "deadline") if k in patch}
+    uncertain = (previous_uncertain - resolved) | current_uncertain
     if uncertain:
-        labels = {r["key"]: r["label"] for r in product["requirements"]} if product else {}
-        conv.draft = {**new, "_uncertain": sorted(uncertain), "_ready": False}
-        return "این بخش مبهم است؛ فقط مقدار نهایی را مشخص کنید: " + "، ".join(
-            labels.get(k, k) for k in sorted(uncertain)
-        )
+        conv.draft = {**new, "_uncertain": sorted(uncertain), "_asked": sorted(uncertain)[0], "_ready": False}
+        return uncertainty_question(uncertain, product)
     try:
         asked, question = ask_missing(db, new, products)
     except HTTPException as exc:
@@ -294,3 +392,72 @@ def apply_extraction(db, conv, customer, draft, result, products, text):
         )
     conv.draft = {**new, "_asked": asked, "_ready": ready, "_uncertain": []}
     return question
+
+
+def clarify_order_change(db, conv, draft, result, product, text):
+    """درخواست ناقص تغییر را به انتخاب مشخصه و سپس مقدار تازه تبدیل می‌کند."""
+    plain = normalize_text(text)
+    requested = result.intent in {"change", "correct"} or any(
+        word in plain for word in ["تغییر", "عوض", "اصلاح", "بجاش", "به جاش"]
+    )
+    asked = conv.draft.get("_change_asked")
+    if not requested and not asked:
+        return None
+    if result.intent == "question" and not requested and plain not in {
+        normalize_text(r["label"]) for r in product["requirements"]
+    }:
+        return None
+    values = result.model_dump()
+    changed = (
+        (result.product_id and result.product_id != draft["product_id"])
+        or (result.quantity and result.quantity != draft["quantity"])
+        or (result.deadline and result.deadline != draft.get("deadline"))
+        or any(v != draft["specifications"].get(k) for k, v in result.specifications.items())
+        or any(v and v != draft["delivery"].get(k) for k, v in values["delivery"].items())
+    )
+    if changed or result.uncertain_fields:
+        # انتخاب صریح همراه سؤال هم باید در مسیر درخواست تغییر بررسی شود.
+        if result.intent == "question" and not is_change_question(plain):
+            result.intent = "change"
+        return None
+    order = db.get(Order, conv.order_id)
+    if order.status == "canceled":
+        return "این سفارش لغو شده و قابل تغییر نیست؛ برای بررسی بیشتر فروشنده را بخواه."
+    if order.status == "shipped":
+        return "این سفارش ارسال شده است. مقدار دقیق تغییر را بنویس تا برای پیگیری دستی فروشنده ثبت شود."
+    for field, aliases in {
+        "quantity": ["تعداد"],
+        "delivery.address": ["نشانی", "آدرس"],
+        "delivery.phone": ["شماره همراه", "شماره موبایل", "تلفن"],
+        "delivery.city": ["شهر"],
+        "deadline": ["موعد", "تاریخ ارسال", "تاریخ تحویل"],
+    }.items():
+        if (requested and any(alias in plain for alias in aliases)) or plain in aliases:
+            conv.draft = {**conv.draft, "_change_asked": field}
+            return "برای درخواست تغییر: " + field_prompt(field, product) + "\nمقدار تازه برای تأیید فروشنده ارسال می‌شود."
+    requirement = next((r for r in product["requirements"] if normalize_text(r["label"]) in plain), None)
+    if not requirement and asked and not requested:
+        requirement = next((r for r in product["requirements"] if asked == "specifications." + r["key"]), None)
+    if requirement:
+        field = "specifications." + requirement["key"]
+        conv.draft = {**conv.draft, "_change_asked": field}
+        current = draft["specifications"].get(requirement["key"], "ثبت نشده")
+        return (
+            f"{requirement['label']} سفارش فعلی «{current}» است. "
+            + ("این همان مقدار فعلی است؛ برای تغییر، مقدار دیگری انتخاب کن.\n" if result.specifications else "مقدار جدیدش چه باشد؟\n")
+            + requirement_prompt(product, requirement)
+            + "\nانتخاب تازه فقط به‌عنوان درخواست برای تأیید فروشنده ثبت می‌شود."
+        )
+    if requested:
+        conv.draft = {**conv.draft, "_change_asked": "field"}
+        choices = [f"{r['label']}: {draft['specifications'].get(r['key'], 'ثبت نشده')}" for r in product["requirements"]]
+        return (
+            "کدام بخش سفارش را می‌خواهی تغییر بدهی؟\n"
+            + "\n".join("• " + choice for choice in choices)
+            + "\nتعداد، نشانی یا موعد ارسال را هم می‌توانی تغییر بدهی. مثلاً بنویس «اندازه» یا «اندازه کوچک بشه». درخواست برای تأیید فروشنده فرستاده می‌شود."
+        )
+    return None
+
+
+def is_change_question(text):
+    return any(word in text for word in ["میشه", "می شه", "می شود", "امکان", "می تونم", "میتونم"])

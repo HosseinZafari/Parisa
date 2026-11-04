@@ -1,5 +1,12 @@
 <script>
   import { onMount } from 'svelte';
+  import { initialTheme, applyTheme } from './lib/theme';
+  let theme = initialTheme();
+  applyTheme(theme);
+  function toggleTheme() {
+    theme = theme === 'light' ? 'dark' : 'light';
+    applyTheme(theme);
+  }
   import { api, navigate, fa, date } from './lib/api';
   import Icon from './components/Icon.svelte';
   import Dashboard from './pages/Dashboard.svelte';
@@ -24,7 +31,8 @@
   let toast = '',
     toastError = false,
     toastTimer;
-  let unread = 0;
+  let unread = 0,
+    urgentUnread = 0;
   const nav = [
     { path: '/dashboard', label: 'نمای کلی', icon: 'grid' },
     { path: '/orders', label: 'سفارش‌ها', icon: 'orders' },
@@ -46,6 +54,7 @@
     try {
       const items = await api('/notifications');
       unread = items.filter((n) => !n.read).length;
+      urgentUnread = items.filter((n) => !n.read && n.priority === 'urgent').length;
     } catch {}
   }
   async function login(e) {
@@ -85,7 +94,7 @@
       })
       .catch(() => {})
       .finally(() => (checking = false));
-    const interval = setInterval(refreshUnread, 15000);
+    const interval = setInterval(refreshUnread, 5000);
     return () => {
       window.removeEventListener('popstate', pop);
       window.removeEventListener('session-expired', expired);
@@ -234,6 +243,23 @@
           >
         </div>
         <div class="topbar-left">
+          {#if urgentUnread}<button
+              class="urgent-notice"
+              onclick={() => navigate('/notifications')}
+              aria-label={'اعلان‌های فوری، ' + fa(urgentUnread) + ' مورد'}
+              ><Icon name="alert" size={16} /><span class="urgent-copy">رسیدگی فوری</span><span
+                aria-live="polite">{fa(urgentUnread)}</span
+              ></button
+            >{/if}
+          <button
+            class="btn secondary small theme-toggle"
+            onclick={toggleTheme}
+            aria-label={theme === 'light' ? 'فعال کردن حالت تاریک' : 'فعال کردن حالت روشن'}
+            aria-pressed={theme === 'dark'}
+            ><span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span>{theme === 'light'
+              ? 'تاریک'
+              : 'روشن'}</button
+          >
           <span class="connection"><i></i>فضای آزمایشی</span><span class="topbar-date"
             ><Icon name="calendar" size={15} />{date(new Date().toISOString())}</span
           ><button
@@ -271,6 +297,28 @@
 {#if toast}<div class:error={toastError} class="toast" role="status">{toast}</div>{/if}
 
 <style>
+  .urgent-notice {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    padding: 7px 10px;
+    background: var(--paper);
+    color: var(--red);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  @media (max-width: 700px) {
+    .urgent-copy {
+      display: none;
+    }
+    .urgent-notice {
+      padding: 7px;
+      gap: 4px;
+    }
+  }
   aside {
     position: fixed;
     top: 0;
@@ -278,8 +326,8 @@
     bottom: 0;
     width: 238px;
     padding: 31px 20px 0;
-    background: #fcfdf9;
-    border-left: 1px solid #e7ece1;
+    background: var(--tone-fcfdf9, #fcfdf9);
+    border-left: 1px solid var(--tone-e7ece1, #e7ece1);
     z-index: 40;
     display: flex;
     flex-direction: column;
@@ -291,14 +339,14 @@
     padding: 0 15px;
     font-size: 27px;
     font-weight: 700;
-    color: #2d563f;
+    color: var(--tone-2d563f, #2d563f);
     letter-spacing: -0.5px;
   }
   .brand small {
     display: block;
     font-size: 9px;
     font-weight: 400;
-    color: #8b9980;
+    color: var(--tone-8b9980, #8b9980);
     letter-spacing: 0;
     margin-top: -2px;
   }
@@ -308,23 +356,23 @@
     justify-content: center;
     width: 43px;
     height: 45px;
-    background: #e8efdf;
+    background: var(--tone-e8efdf, #e8efdf);
     border-radius: 14px 14px 14px 3px;
-    color: #668453;
+    color: var(--tone-668453, #668453);
   }
   .shop-card {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: white;
-    border: 1px solid #e7ecdf;
+    background: var(--tone-fff, #fff);
+    border: 1px solid var(--tone-e7ecdf, #e7ecdf);
     border-radius: 10px;
     padding: 12px 9px;
     margin: 30px 0;
   }
   .shop-card > :global(svg) {
     margin-right: auto;
-    color: #8e9b83;
+    color: var(--tone-8e9b83, #8e9b83);
   }
   .shop-card strong {
     font-size: 10px;
@@ -332,7 +380,7 @@
   }
   .shop-card small {
     font-size: 8px;
-    color: #9ba48f;
+    color: var(--tone-9ba48f, #9ba48f);
     display: block;
     margin-top: 5px;
   }
@@ -340,16 +388,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f1efe2;
-    border: 1px solid #e7e3d0;
+    background: var(--tone-f1efe2, #f1efe2);
+    border: 1px solid var(--tone-e7e3d0, #e7e3d0);
     width: 32px;
     height: 32px;
     border-radius: 9px;
-    color: #aa9c73;
+    color: var(--tone-aa9c73, #aa9c73);
   }
   .nav-caption {
     font-size: 9px;
-    color: #a0aa95;
+    color: var(--tone-a0aa95, #a0aa95);
     padding: 0 14px;
     margin: 0 0 10px;
   }
@@ -363,25 +411,25 @@
     align-items: center;
     padding: 12px 15px;
     border-radius: 8px;
-    color: #829078;
+    color: var(--tone-829078, #829078);
     font-size: 12px;
   }
   nav a:hover {
-    background: #f3f6ed;
+    background: var(--tone-f3f6ed, #f3f6ed);
   }
   nav a.active {
-    background: #eaf0e2;
-    color: #416536;
+    background: var(--tone-eaf0e2, #eaf0e2);
+    color: var(--tone-416536, #416536);
     font-weight: 600;
   }
   nav a.active :global(svg) {
-    color: #5e7d49;
+    color: var(--tone-5e7d49, #5e7d49);
   }
   .nav-count {
     margin-right: auto;
     border-radius: 4px;
     font-weight: 400;
-    background: #dce7cf;
+    background: var(--tone-dce7cf, #dce7cf);
     padding: 1px 6px;
     font-size: 9px;
   }
@@ -390,8 +438,8 @@
     padding-top: 25px;
   }
   .little-note {
-    background: #f1f4e9;
-    border: 1px solid #e9eddc;
+    background: var(--tone-f1f4e9, #f1f4e9);
+    border: 1px solid var(--tone-e9eddc, #e9eddc);
     border-radius: 11px;
     margin: 0 4px 22px;
     padding: 17px 14px;
@@ -402,21 +450,21 @@
     position: absolute;
     left: 10px;
     top: 12px;
-    color: #b8c5a8;
+    color: var(--tone-b8c5a8, #b8c5a8);
     transform: rotate(-25deg);
   }
   .little-note strong {
     font-size: 10px;
-    color: #7a8e67;
+    color: var(--tone-7a8e67, #7a8e67);
   }
   .little-note p {
     font-size: 10px;
-    color: #a0ac90;
+    color: var(--tone-a0ac90, #a0ac90);
     margin: 8px 0 12px;
   }
   .little-note button {
     font-size: 9px;
-    color: #778d63;
+    color: var(--tone-778d63, #778d63);
   }
   .settings-link {
     display: flex;
@@ -424,10 +472,10 @@
     gap: 11px;
     padding: 10px 14px 22px;
     font-size: 11px;
-    color: #8b9881;
+    color: var(--tone-8b9881, #8b9881);
   }
   .seller-card {
-    border-top: 1px solid #e7ecdf;
+    border-top: 1px solid var(--tone-e7ecdf, #e7ecdf);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -439,7 +487,7 @@
   }
   .seller-card small {
     display: block;
-    color: #9da792;
+    color: var(--tone-9da792, #9da792);
     font-size: 9px;
     margin-top: 2px;
   }
@@ -452,12 +500,12 @@
   }
   .topbar {
     height: 79px;
-    border-bottom: 1px solid #e7ece1;
+    border-bottom: 1px solid var(--tone-e7ece1, #e7ece1);
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 38px;
-    background: #fdfefa99;
+    background: var(--tone-fdfefa99, #fdfefa99);
     gap: 15px;
   }
   .breadcrumb,
@@ -466,10 +514,10 @@
     align-items: center;
     gap: 14px;
     font-size: 10px;
-    color: #a0a894;
+    color: var(--tone-a0a894, #a0a894);
   }
   .breadcrumb strong {
-    color: #718266;
+    color: var(--tone-718266, #718266);
     font-weight: 400;
   }
   .topbar-left {
@@ -480,11 +528,11 @@
     align-items: center;
     gap: 8px;
     font-size: 10px;
-    color: #9aa58c;
+    color: var(--tone-9aa58c, #9aa58c);
   }
   .connection {
     font-size: 9px;
-    color: #8b9b7c;
+    color: var(--tone-8b9b7c, #8b9b7c);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -492,13 +540,13 @@
   .connection i {
     width: 5px;
     height: 5px;
-    background: #8ba477;
+    background: var(--tone-8ba477, #8ba477);
     border-radius: 50%;
   }
   .notification-button {
     position: relative;
-    border: 1px solid #e6ebdf;
-    background: #fcfdf9;
+    border: 1px solid var(--tone-e6ebdf, #e6ebdf);
+    background: var(--tone-fcfdf9, #fcfdf9);
     border-radius: 9px;
   }
   .notification-button i {
@@ -508,8 +556,8 @@
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: #c49c70;
-    border: 1px solid white;
+    background: var(--tone-c49c70, #c49c70);
+    border: 1px solid var(--tone-fff, #fff);
   }
   .main-content {
     padding: 31px 38px 0;
@@ -522,8 +570,8 @@
     gap: 15px;
     margin-top: 38px;
     padding: 22px 0;
-    border-top: 1px solid #e7ecdf;
-    color: #acb49f;
+    border-top: 1px solid var(--tone-e7ecdf, #e7ecdf);
+    color: var(--tone-acb49f, #acb49f);
     font-size: 9px;
   }
   .workspace-footer span:first-child {
@@ -538,12 +586,12 @@
     display: grid;
     grid-template-columns: 1fr 1.1fr;
     min-height: 100vh;
-    background: #fafbf7;
+    background: var(--tone-fafbf7, #fafbf7);
     direction: ltr;
   }
   .login-art {
-    background: #2c5240;
-    color: #e1e8d6;
+    background: var(--tone-2c5240, #2c5240);
+    color: var(--tone-e1e8d6, #e1e8d6);
     position: relative;
     overflow: hidden;
     display: flex;
@@ -562,31 +610,31 @@
     font-size: 14px;
     line-height: 2.1;
     text-align: center;
-    color: #adc0a2;
+    color: var(--tone-adc0a2, #adc0a2);
     margin-top: 15px;
     z-index: 1;
   }
   .login-art > small {
     position: absolute;
     bottom: 45px;
-    color: #9bb28d;
+    color: var(--tone-9bb28d, #9bb28d);
     font-size: 10px;
   }
   .art-mark {
-    color: #b7c99f;
+    color: var(--tone-b7c99f, #b7c99f);
     z-index: 1;
   }
   .art-rings {
     position: absolute;
     width: 650px;
     height: 650px;
-    border: 1px solid #ffffff0d;
+    border: 1px solid var(--tone-ffffff0d, #ffffff0d);
     border-radius: 50%;
     bottom: -360px;
     left: -200px;
     box-shadow:
-      0 0 0 70px #ffffff03,
-      0 0 0 140px #ffffff02;
+      0 0 0 70px var(--tone-ffffff03, #ffffff03),
+      0 0 0 140px var(--tone-ffffff02, #ffffff02);
   }
   .login-content {
     direction: rtl;
@@ -603,7 +651,7 @@
   }
   .login-brand span {
     font-size: 10px;
-    color: #a4ae98;
+    color: var(--tone-a4ae98, #a4ae98);
     font-weight: 400;
     margin-right: 10px;
   }
@@ -630,10 +678,10 @@
     display: flex;
     gap: 9px;
     padding: 13px;
-    background: #f0f3e9;
+    background: var(--tone-f0f3e9, #f0f3e9);
     border-radius: 8px;
     margin-bottom: 22px;
-    color: #899877;
+    color: var(--tone-899877, #899877);
   }
   .demo-note p {
     font-size: 10px;
@@ -644,11 +692,11 @@
   }
   .demo-note small {
     font-size: 9px;
-    color: #a1aa92;
+    color: var(--tone-a1aa92, #a1aa92);
   }
   .login-foot {
     font-size: 9px;
-    color: #a6b096;
+    color: var(--tone-a6b096, #a6b096);
     text-align: center;
   }
   .nav-shade {
@@ -709,7 +757,7 @@
       position: fixed;
       inset: 0;
       z-index: 39;
-      background: #19332166;
+      background: var(--tone-19332166, #19332166);
       backdrop-filter: blur(2px);
     }
     .little-note {

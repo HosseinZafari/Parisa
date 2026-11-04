@@ -20,9 +20,19 @@ def main():
 
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="ابزار مدیریت پایگاه دادهٔ پریسا")
-    parser.add_argument("action", choices=["migrate", "seed", "reset-demo", "set-password"])
+    parser.add_argument("action", choices=["migrate", "seed", "reset-demo", "set-password", "check-llm"])
     parser.add_argument("--yes", action="store_true")
     args = parser.parse_args()
+    if args.action == "check-llm":
+        from .llm import check_connection
+
+        status = check_connection()
+        print(status["message"])
+        if status["model"]:
+            print("مدل:", status["model"])
+        if status["http_status"]:
+            print("وضعیت HTTP:", status["http_status"])
+        raise SystemExit(0 if status["status"] in {"ready", "mock"} else 1)
     if args.action == "reset-demo":
         from .config import settings
 

@@ -107,9 +107,9 @@
     align-items: center;
     justify-content: center;
     gap: 7px;
-    background: #fbf4e5;
-    color: #b29764;
-    border: 1px solid #eee1c5;
+    background: var(--tone-fbf4e5, #fbf4e5);
+    color: var(--tone-b29764, #b29764);
+    border: 1px solid var(--tone-eee1c5, #eee1c5);
     border-radius: 7px;
     font-size: 10px;
     padding: 11px;
@@ -119,8 +119,8 @@
     text-align: center;
   }
   .payment-amount {
-    background: #f1f5e9;
-    border: 1px solid #e6eddb;
+    background: var(--tone-f1f5e9, #f1f5e9);
+    border: 1px solid var(--tone-e6eddb, #e6eddb);
     border-radius: 10px;
     padding: 20px;
     text-align: center;
@@ -129,11 +129,11 @@
   .payment-amount > span {
     display: block;
     font-size: 10px;
-    color: #a0af8c;
+    color: var(--tone-a0af8c, #a0af8c);
   }
   .payment-amount strong {
     display: block;
-    color: #6f8b57;
+    color: var(--tone-6f8b57, #6f8b57);
     font-size: 29px;
     font-weight: 500;
     margin-top: 7px;

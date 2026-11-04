@@ -19,7 +19,7 @@
   }
   onMount(() => {
     load();
-    const poll = setInterval(load, 15000);
+    const poll = setInterval(load, 5000);
     return () => clearInterval(poll);
   });
   $: queue =
@@ -48,220 +48,309 @@
     : [];
 </script>
 
-<div class="page-heading">
-  <div>
-    <span class="eyebrow">یک روز تازه، چند قدم کوچک</span>
-    <h1>سلام پریسا، روزت به‌خیر <span class="greeting-leaf">✧</span></h1>
-    <p>سفارش‌ها اینجا مرتب‌اند؛ با خیال راحت به ساختن ادامه بده.</p>
-  </div>
-  <div class="heading-actions">
-    <button
-      class="btn secondary"
-      onclick={() => {
-        refreshing = true;
-        load();
-      }}
-      disabled={refreshing}
-      ><Icon name="refresh" size={15} />{refreshing ? 'در حال دریافت…' : 'به‌روزرسانی'}</button
-    ><button class="btn" onclick={() => navigate('/chat')}><Icon name="plus" size={17} />سفارش آزمایشی</button
-    >
-  </div>
-</div>
-{#if error}<div class="error-banner" role="alert">
-    {error}<button class="text-button" onclick={load}>تلاش دوباره</button>
-  </div>{/if}
-{#if !data}<div class="loading"><span class="spinner"></span>در حال مرور سفارش‌ها…</div>{:else}
-  <div class="stats-grid">
-    <button class="stat-card" onclick={() => navigate('/orders')}
-      ><div class="stat-top">
-        <span>کل سفارش‌ها</span><span class="stat-icon sage"><Icon name="orders" size={18} /></span>
-      </div>
-      <strong>{fa(data.total_orders)}<small>سفارش</small></strong>
-      <div class="stat-bottom">
-        <span class="green-text">{fa(data.daily.reduce((a, d) => a + d.orders, 0))} سفارش</span><span
-          >در هفت روز گذشته</span
-        >
-      </div></button
-    >
-    <button class="stat-card" onclick={() => navigate('/orders?status=paid_awaiting_preparation')}
-      ><div class="stat-top">
-        <span>منتظر آماده‌سازی</span><span class="stat-icon lilac"><Icon name="box" size={19} /></span>
-      </div>
-      <strong>{fa(data.status_counts.paid_awaiting_preparation)}<small>سفارش پرداخت‌شده</small></strong>
-      <div class="stat-bottom">
-        <span class="tiny-dot lilac"></span><span>آمادهٔ شروع کار شما</span>
-      </div></button
-    >
-    <button
-      class="stat-card"
-      onclick={() => {
-        filter = 'today';
-        document.getElementById('work-queue')?.scrollIntoView({ behavior: 'smooth' });
-      }}
-      ><div class="stat-top">
-        <span>ارسال‌های امروز</span><span class="stat-icon sand"><Icon name="truck" size={19} /></span>
-      </div>
-      <strong>{fa(data.due_today)}<small>سفارش</small></strong>
-      <div class="stat-bottom">
-        <span class="tiny-dot sand"></span><span
-          >{data.due_today ? 'امروز به دست پست می‌رسند' : 'برای امروز ارسالی ندارید'}</span
-        >
-      </div></button
-    >
-    <div class="stat-card income">
-      <div class="stat-top">
-        <span>مجموع پرداخت‌های آزمایشی</span><span class="stat-icon"><Icon name="wallet" size={18} /></span>
-      </div>
-      <strong class="money-stat">{fa(data.paid_total)}<small>تومان</small></strong>
-      <div class="stat-bottom"><Icon name="lock" size={12} /><span>بدون جابه‌جایی پول واقعی</span></div>
+<div class="dashboard-view">
+  <div class="page-heading">
+    <div>
+      <span class="eyebrow">یک روز تازه، چند قدم کوچک</span>
+      <h1>سلام پریسا، روزت به‌خیر <span class="greeting-leaf">✧</span></h1>
+      <p>سفارش‌ها اینجا مرتب‌اند؛ با خیال راحت به ساختن ادامه بده.</p>
     </div>
-  </div>
-  <div class="attention-strip">
-    <div class="attention-copy">
-      <span class="attention-icon"><Icon name={data.overdue ? 'alert' : 'check'} size={19} /></span>
-      <div>
-        <strong
-          >{data.overdue
-            ? `${fa(data.overdue)} سفارش از موعد ارسال گذشته است.`
-            : 'همه‌چیز برای یک روز مرتب آماده است.'}</strong
-        >
-        <p>
-          {data.pending_changes
-            ? `${fa(data.pending_changes)} درخواست تغییر هم منتظر بررسی شماست؛ بهتر است از اینجا شروع کنید.`
-            : 'کارهای مهم‌تر، بالاتر از بقیه قرار گرفته‌اند.'}
-        </p>
-      </div>
-    </div>
-    <button
-      class="text-button"
-      onclick={() => {
-        filter = data.overdue ? 'late' : 'change';
-        document.getElementById('work-queue')?.scrollIntoView({ behavior: 'smooth' });
-      }}>دیدن کارهای مهم<Icon name="arrow" size={15} /></button
-    >
-  </div>
-  <section class="panel queue-panel" id="work-queue">
-    <div class="panel-head">
-      <div>
-        <h2>اول از کجا شروع کنم؟ <span class="pill-count">{fa(data.queue.length)} کار</span></h2>
-        <p>کارهای مهم، به ترتیب موعد و نیاز به رسیدگی</p>
-      </div>
-      <button class="text-button all-orders" onclick={() => navigate('/orders')}
-        >همهٔ سفارش‌ها <Icon name="arrow" size={14} /></button
+    <div class="heading-actions">
+      <button
+        class="btn secondary"
+        onclick={() => {
+          refreshing = true;
+          load();
+        }}
+        disabled={refreshing}
+        ><Icon name="refresh" size={15} />{refreshing ? 'در حال دریافت…' : 'به‌روزرسانی'}</button
+      ><button class="btn" onclick={() => navigate('/chat')}
+        ><Icon name="plus" size={17} />سفارش آزمایشی</button
       >
     </div>
-    <div class="queue-tabs">
-      <div class="tabs">
-        <button class:active={filter === 'all'} class="tab" onclick={() => (filter = 'all')}
-          >همهٔ کارها</button
-        ><button class:active={filter === 'late'} class="tab" onclick={() => (filter = 'late')}
-          >از موعد گذشته <span class="count">{fa(data.overdue)}</span></button
-        ><button class:active={filter === 'today'} class="tab" onclick={() => (filter = 'today')}
-          >موعد امروز <span class="count">{fa(data.due_today)}</span></button
-        ><button class:active={filter === 'change'} class="tab" onclick={() => (filter = 'change')}
-          >درخواست تغییر <span class="count">{fa(data.pending_changes)}</span></button
-        >
-      </div>
-      <span class="sort-label"><Icon name="filter" size={14} />اولویت رسیدگی</span>
-    </div>
-    <OrderTable orders={queue.slice(0, 5)} compact />
-    <div class="table-footer">
-      <span>نمایش {fa(Math.min(queue.length, 5))} از {fa(queue.length)} کار</span><button
-        class="text-button"
-        onclick={() => navigate('/orders')}>مشاهدهٔ همهٔ سفارش‌ها<Icon name="chevron" size={13} /></button
+  </div>
+  {#if error}<div class="error-banner" role="alert">
+      {error}<button class="text-button" onclick={load}>تلاش دوباره</button>
+    </div>{/if}
+  {#if !data}<div class="loading"><span class="spinner"></span>در حال مرور سفارش‌ها…</div>{:else}
+    {#if data.attention_queue?.length}
+      <section
+        class="panel support-queue"
+        class:has-urgent={data.urgent_conversations > 0}
+        aria-label="گفتگوهای نیازمند رسیدگی"
       >
-    </div>
-  </section>
-  <div class="dashboard-bottom">
-    <section class="panel chart-panel">
-      <div class="panel-head">
-        <div>
-          <h2>نبض این هفته</h2>
-          <p>تعداد سفارش‌ها در هفت روز گذشته</p>
+        <div class="panel-head">
+          <div>
+            <h2>گفتگوهای منتظر شما <span class="pill-count">{fa(data.pending_conversations)}</span></h2>
+            <p>
+              {data.urgent_conversations
+                ? fa(data.urgent_conversations) + ' مورد فوری؛ ابتدا این گفتگوها را بررسی کنید.'
+                : 'مشتری‌هایی که به پاسخ مستقیم شما نیاز دارند.'}
+            </p>
+          </div>
+          <button class="text-button" onclick={() => navigate('/conversations')}
+            >همهٔ گفتگوها<Icon name="arrow" size={14} /></button
+          >
         </div>
-        <span class="tag"><Icon name="calendar" size={12} />۷ روز اخیر</span>
-      </div>
-      <div class="chart-summary">
-        <strong>{fa(data.daily.reduce((a, d) => a + d.orders, 0))}</strong><span>سفارش ثبت‌شده</span>
-        <div class="chart-legend"><i></i>سفارش‌ها</div>
-      </div>
-      <div
-        class="bar-chart"
-        role="img"
-        aria-label={'نمودار سفارش‌های هفته: ' +
-          data.daily.map((d) => date(d.date) + '، ' + fa(d.orders) + ' سفارش').join('؛ ')}
-      >
-        <div class="grid-lines">
-          <span>{fa(maxDaily)}</span><span>{fa(Math.round(maxDaily / 2))}</span><span>۰</span>
-        </div>
-        {#each data.daily as d, i}<div class="bar-column">
-            <div class="bar-track">
-              <div
-                class="bar"
-                class:current={i === 6}
-                style:height={Math.max(4, (d.orders / maxDaily) * 100) + '%'}
+        {#each data.attention_queue.slice(0, 3) as task}<div class="support-task">
+            <div>
+              <strong
+                >{task.customer_name}{#if task.priority === 'urgent'}<span class="support-urgent">فوری</span
+                  >{/if}</strong
               >
-                <span>{fa(d.orders)}</span>
-              </div>
+              <p>{task.reason}</p>
             </div>
-            <span class:current-label={i === 6}>{shortDate(d.date)}</span>
+            <button
+              class="btn secondary small"
+              onclick={() => navigate('/conversations?id=' + task.conversation_id)}
+              >بررسی و پاسخ<Icon name="chat" size={14} /></button
+            >
           </div>{/each}
-      </div>
-    </section>
-    <section class="panel status-panel">
-      <div class="panel-head">
-        <div>
-          <h2>سفارش‌ها در چه مرحله‌اند؟</h2>
-          <p>یک نگاه به مسیر سفارش‌ها</p>
+      </section>
+    {/if}
+    <div class="stats-grid">
+      <button class="stat-card" onclick={() => navigate('/orders')}
+        ><div class="stat-top">
+          <span>کل سفارش‌ها</span><span class="stat-icon sage"><Icon name="orders" size={18} /></span>
         </div>
-        <Icon name="orders" size={17} />
-      </div>
-      <div class="status-track" role="img" aria-label="توزیع وضعیت سفارش‌ها">
-        {#each statusGroups as g}{#if g.value}<span
-              style:background={g.color}
-              style:flex={g.value}
-              title={g.label + ': ' + fa(g.value)}
-            ></span>{/if}{/each}
-      </div>
-      <div class="status-legend">
-        {#each statusGroups.filter((g) => g.value) as group}<button onclick={() => navigate('/orders')}
-            ><span class="legend-dot" style:background={group.color}></span><span>{group.label}</span><strong
-              >{fa(group.value)}</strong
-            ></button
-          >{/each}
-      </div>
-      <div class="customer-total">
-        <Icon name="people" size={15} /><span>{fa(data.total_customers)} مشتری، همراه فروشگاه شما</span>
-      </div>
-    </section>
-    <section class="panel recent-panel">
-      <div class="panel-head">
-        <div>
-          <h2>آخرین همراه‌ها</h2>
-          <p>مشتری‌هایی با گفتگوی تازه</p>
-        </div>
-        <Icon name="people" size={17} />
-      </div>
-      <div class="recent-list">
-        {#each data.recent_customers.slice(0, 4) as c, i}<button
-            onclick={() => navigate('/customers/' + c.id)}
-            ><span class="avatar tone-{i}">{c.name.slice(0, 1)}</span><span
-              ><strong>{c.name}</strong><small dir="ltr">@{c.username}</small></span
-            ><Icon name="chevron" size={13} /></button
-          >{/each}
-      </div>
-      <button class="recent-all text-button" onclick={() => navigate('/customers')}
-        >همهٔ مشتری‌ها<Icon name="arrow" size={14} /></button
+        <strong>{fa(data.total_orders)}<small>سفارش</small></strong>
+        <div class="stat-bottom">
+          <span class="green-text">{fa(data.daily.reduce((a, d) => a + d.orders, 0))} سفارش</span><span
+            >در هفت روز گذشته</span
+          >
+        </div></button
       >
+      <button class="stat-card" onclick={() => navigate('/orders?status=paid_awaiting_preparation')}
+        ><div class="stat-top">
+          <span>منتظر آماده‌سازی</span><span class="stat-icon lilac"><Icon name="box" size={19} /></span>
+        </div>
+        <strong>{fa(data.status_counts.paid_awaiting_preparation)}<small>سفارش پرداخت‌شده</small></strong>
+        <div class="stat-bottom">
+          <span class="tiny-dot lilac"></span><span>آمادهٔ شروع کار شما</span>
+        </div></button
+      >
+      <button
+        class="stat-card"
+        onclick={() => {
+          filter = 'today';
+          document.getElementById('work-queue')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        ><div class="stat-top">
+          <span>ارسال‌های امروز</span><span class="stat-icon sand"><Icon name="truck" size={19} /></span>
+        </div>
+        <strong>{fa(data.due_today)}<small>سفارش</small></strong>
+        <div class="stat-bottom">
+          <span class="tiny-dot sand"></span><span
+            >{data.due_today ? 'امروز به دست پست می‌رسند' : 'برای امروز ارسالی ندارید'}</span
+          >
+        </div></button
+      >
+      <div class="stat-card income">
+        <div class="stat-top">
+          <span>مجموع پرداخت‌های آزمایشی</span><span class="stat-icon"><Icon name="wallet" size={18} /></span>
+        </div>
+        <strong class="money-stat">{fa(data.paid_total)}<small>تومان</small></strong>
+        <div class="stat-bottom"><Icon name="lock" size={12} /><span>بدون جابه‌جایی پول واقعی</span></div>
+      </div>
+    </div>
+    <div class="attention-strip">
+      <div class="attention-copy">
+        <span class="attention-icon"><Icon name={data.overdue ? 'alert' : 'check'} size={19} /></span>
+        <div>
+          <strong
+            >{data.overdue
+              ? `${fa(data.overdue)} سفارش از موعد ارسال گذشته است.`
+              : 'همه‌چیز برای یک روز مرتب آماده است.'}</strong
+          >
+          <p>
+            {data.pending_changes
+              ? `${fa(data.pending_changes)} درخواست تغییر هم منتظر بررسی شماست؛ بهتر است از اینجا شروع کنید.`
+              : 'کارهای مهم‌تر، بالاتر از بقیه قرار گرفته‌اند.'}
+          </p>
+        </div>
+      </div>
+      <button
+        class="text-button"
+        onclick={() => {
+          filter = data.pending_changes ? 'change' : data.overdue ? 'late' : 'all';
+          document.getElementById('work-queue')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        >{data.pending_changes ? `بررسی ${fa(data.pending_changes)} درخواست تغییر` : 'دیدن کارهای مهم'}<Icon
+          name="arrow"
+          size={15}
+        /></button
+      >
+    </div>
+    <section class="panel queue-panel" id="work-queue">
+      <div class="panel-head">
+        <div>
+          <h2>اول از کجا شروع کنم؟ <span class="pill-count">{fa(data.queue.length)} کار</span></h2>
+          <p>کارهای مهم، به ترتیب موعد و نیاز به رسیدگی</p>
+        </div>
+        <button class="text-button all-orders" onclick={() => navigate('/orders')}
+          >همهٔ سفارش‌ها <Icon name="arrow" size={14} /></button
+        >
+      </div>
+      <div class="queue-tabs">
+        <div class="tabs">
+          <button class:active={filter === 'all'} class="tab" onclick={() => (filter = 'all')}
+            >همهٔ کارها</button
+          ><button class:active={filter === 'late'} class="tab" onclick={() => (filter = 'late')}
+            >از موعد گذشته <span class="count">{fa(data.overdue)}</span></button
+          ><button class:active={filter === 'today'} class="tab" onclick={() => (filter = 'today')}
+            >موعد امروز <span class="count">{fa(data.due_today)}</span></button
+          ><button class:active={filter === 'change'} class="tab" onclick={() => (filter = 'change')}
+            >درخواست تغییر <span class="count">{fa(data.pending_changes)}</span></button
+          >
+        </div>
+        <span class="sort-label"><Icon name="filter" size={14} />اولویت رسیدگی</span>
+      </div>
+      <OrderTable orders={queue.slice(0, 5)} compact />
+      <div class="table-footer">
+        <span>نمایش {fa(Math.min(queue.length, 5))} از {fa(queue.length)} کار</span><button
+          class="text-button"
+          onclick={() => navigate('/orders')}>مشاهدهٔ همهٔ سفارش‌ها<Icon name="chevron" size={13} /></button
+        >
+      </div>
     </section>
-  </div>
-{/if}
+    <details class="dashboard-insights">
+      <summary
+        ><span
+          ><strong>آمار و همراه‌های فروشگاه</strong><small>روند هفتگی، وضعیت سفارش‌ها و مشتری‌های اخیر</small
+          ></span
+        ><span class="insights-toggle"
+          ><span class="when-closed">نمایش جزئیات</span><span class="when-open">بستن جزئیات</span></span
+        ></summary
+      >
+      <div class="dashboard-bottom">
+        <section class="panel chart-panel">
+          <div class="panel-head">
+            <div>
+              <h2>نبض این هفته</h2>
+              <p>تعداد سفارش‌ها در هفت روز گذشته</p>
+            </div>
+            <span class="tag"><Icon name="calendar" size={12} />۷ روز اخیر</span>
+          </div>
+          <div class="chart-summary">
+            <strong>{fa(data.daily.reduce((a, d) => a + d.orders, 0))}</strong><span>سفارش ثبت‌شده</span>
+            <div class="chart-legend"><i></i>سفارش‌ها</div>
+          </div>
+          <div
+            class="bar-chart"
+            role="img"
+            aria-label={'نمودار سفارش‌های هفته: ' +
+              data.daily.map((d) => date(d.date) + '، ' + fa(d.orders) + ' سفارش').join('؛ ')}
+          >
+            <div class="grid-lines">
+              <span>{fa(maxDaily)}</span><span>{fa(Math.round(maxDaily / 2))}</span><span>۰</span>
+            </div>
+            {#each data.daily as d, i}<div class="bar-column">
+                <div class="bar-track">
+                  <div
+                    class="bar"
+                    class:current={i === 6}
+                    style:height={Math.max(4, (d.orders / maxDaily) * 100) + '%'}
+                  >
+                    <span>{fa(d.orders)}</span>
+                  </div>
+                </div>
+                <span class:current-label={i === 6}>{shortDate(d.date)}</span>
+              </div>{/each}
+          </div>
+        </section>
+        <section class="panel status-panel">
+          <div class="panel-head">
+            <div>
+              <h2>سفارش‌ها در چه مرحله‌اند؟</h2>
+              <p>یک نگاه به مسیر سفارش‌ها</p>
+            </div>
+            <Icon name="orders" size={17} />
+          </div>
+          <div class="status-track" role="img" aria-label="توزیع وضعیت سفارش‌ها">
+            {#each statusGroups as g}{#if g.value}<span
+                  style:background={g.color}
+                  style:flex={g.value}
+                  title={g.label + ': ' + fa(g.value)}
+                ></span>{/if}{/each}
+          </div>
+          <div class="status-legend">
+            {#each statusGroups.filter((g) => g.value) as group}<button onclick={() => navigate('/orders')}
+                ><span class="legend-dot" style:background={group.color}></span><span>{group.label}</span
+                ><strong>{fa(group.value)}</strong></button
+              >{/each}
+          </div>
+          <div class="customer-total">
+            <Icon name="people" size={15} /><span>{fa(data.total_customers)} مشتری، همراه فروشگاه شما</span>
+          </div>
+        </section>
+        <section class="panel recent-panel">
+          <div class="panel-head">
+            <div>
+              <h2>آخرین همراه‌ها</h2>
+              <p>مشتری‌هایی با گفتگوی تازه</p>
+            </div>
+            <Icon name="people" size={17} />
+          </div>
+          <div class="recent-list">
+            {#each data.recent_customers.slice(0, 4) as c, i}<button
+                onclick={() => navigate('/customers/' + c.id)}
+                ><span class="avatar tone-{i}">{c.name.slice(0, 1)}</span><span
+                  ><strong>{c.name}</strong><small dir="ltr">@{c.username}</small></span
+                ><Icon name="chevron" size={13} /></button
+              >{/each}
+          </div>
+          <button class="recent-all text-button" onclick={() => navigate('/customers')}
+            >همهٔ مشتری‌ها<Icon name="arrow" size={14} /></button
+          >
+        </section>
+      </div>
+    </details>
+  {/if}
+</div>
 
 <style>
+  .support-queue {
+    margin-bottom: 25px;
+  }
+  .support-queue.has-urgent {
+    border-color: var(--red);
+  }
+  .support-task {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 17px 24px;
+    border-top: 1px solid var(--line);
+  }
+  .support-task strong {
+    font-size: 13px;
+  }
+  .support-task p {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.9;
+  }
+  .support-urgent {
+    color: var(--red);
+    font-size: 11px;
+    margin-inline-start: 10px;
+  }
+  @media (max-width: 700px) {
+    .support-task {
+      padding: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .support-queue .panel-head {
+      flex-wrap: wrap;
+    }
+  }
   .greeting-leaf {
     font-size: 26px;
     font-weight: 400;
-    color: #acb293;
+    color: var(--tone-acb293, #acb293);
     margin-right: 7px;
   }
   .stats-grid {
@@ -274,7 +363,7 @@
     display: block;
     text-align: right;
     padding: 21px 22px;
-    background: white;
+    background: var(--tone-fff, #fff);
     border: 1px solid var(--line);
     border-radius: 13px;
     transition: transform 0.15s;
@@ -290,7 +379,7 @@
   }
   .stat-top > span:first-child {
     font-size: 10px;
-    color: #8e9a83;
+    color: var(--tone-8e9a83, #8e9a83);
   }
   .stat-icon {
     width: 34px;
@@ -299,20 +388,20 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #e4ecd8;
-    color: #7e9967;
+    background: var(--tone-e4ecd8, #e4ecd8);
+    color: var(--tone-7e9967, #7e9967);
   }
   .stat-icon.sage {
-    background: #eff4e9;
-    color: #96ac80;
+    background: var(--tone-eff4e9, #eff4e9);
+    color: var(--tone-96ac80, #96ac80);
   }
   .stat-icon.lilac {
-    background: #f2eff7;
-    color: #b2a3c2;
+    background: var(--tone-f2eff7, #f2eff7);
+    color: var(--tone-b2a3c2, #b2a3c2);
   }
   .stat-icon.sand {
-    background: #faf4e7;
-    color: #c8b38b;
+    background: var(--tone-faf4e7, #faf4e7);
+    color: var(--tone-c8b38b, #c8b38b);
   }
   .stat-card > strong {
     display: block;
@@ -324,7 +413,7 @@
   .stat-card > strong small {
     font-size: 10px;
     font-weight: 400;
-    color: #a0a995;
+    color: var(--tone-a0a995, #a0a995);
     margin-right: 9px;
   }
   .stat-bottom {
@@ -332,41 +421,41 @@
     align-items: center;
     gap: 5px;
     font-size: 9px;
-    color: #a1ab97;
+    color: var(--tone-a1ab97, #a1ab97);
     min-height: 20px;
   }
   .stat-bottom .green-text {
-    color: #849b70;
+    color: var(--tone-849b70, #849b70);
   }
   .stat-card.income {
-    background: #edf2e5;
-    border-color: #e2ead6;
+    background: var(--tone-edf2e5, #edf2e5);
+    border-color: var(--tone-e2ead6, #e2ead6);
   }
   .income .stat-top > span:first-child {
-    color: #7f926d;
+    color: var(--tone-7f926d, #7f926d);
   }
   .stat-card > .money-stat {
     font-size: 25px;
-    color: #537143;
+    color: var(--tone-537143, #537143);
     margin-top: 21px;
     margin-bottom: 18px;
   }
   .money-stat small {
-    color: #8b9d7a !important;
+    color: var(--tone-8b9d7a, #8b9d7a) !important;
   }
   .tiny-dot {
     width: 5px;
     height: 5px;
     border-radius: 50%;
     display: block;
-    background: #b1a3c1;
+    background: var(--tone-b1a3c1, #b1a3c1);
   }
   .tiny-dot.sand {
-    background: #c5b38e;
+    background: var(--tone-c5b38e, #c5b38e);
   }
   .attention-strip {
-    background: #f4f0e5;
-    border: 1px solid #eee7d4;
+    background: var(--tone-f4f0e5, #f4f0e5);
+    border: 1px solid var(--tone-eee7d4, #eee7d4);
     border-radius: 10px;
     padding: 15px 21px;
     display: flex;
@@ -382,19 +471,19 @@
   }
   .attention-copy strong {
     font-size: 11px;
-    color: #978456;
+    color: var(--tone-978456, #978456);
   }
   .attention-copy p {
     font-size: 10px;
-    color: #b2a47f;
+    color: var(--tone-b2a47f, #b2a47f);
     margin-top: 3px;
   }
   .attention-icon {
-    color: #bea46c;
+    color: var(--tone-bea46c, #bea46c);
     display: flex;
   }
   .attention-strip > .text-button {
-    color: #a49064;
+    color: var(--tone-a49064, #a49064);
     font-size: 10px;
     flex-shrink: 0;
   }
@@ -407,7 +496,7 @@
   }
   .sort-label {
     font-size: 9px;
-    color: #a0a997;
+    color: var(--tone-a0a997, #a0a997);
     display: flex;
     gap: 6px;
     align-items: center;
@@ -428,7 +517,7 @@
     font-size: 9px;
   }
   .dashboard-bottom .panel-head > :global(svg) {
-    color: #a9b49b;
+    color: var(--tone-a9b49b, #a9b49b);
   }
   .chart-summary {
     padding: 0 24px;
@@ -442,7 +531,7 @@
   }
   .chart-summary > span {
     font-size: 9px;
-    color: #a4ad97;
+    color: var(--tone-a4ad97, #a4ad97);
   }
   .chart-legend {
     margin-right: auto;
@@ -450,13 +539,13 @@
     align-items: center;
     gap: 5px;
     font-size: 8px;
-    color: #9eaa90;
+    color: var(--tone-9eaa90, #9eaa90);
   }
   .chart-legend i {
     width: 6px;
     height: 6px;
     border-radius: 2px;
-    background: #9db38b;
+    background: var(--tone-9db38b, #9db38b);
   }
   .bar-chart {
     height: 155px;
@@ -476,10 +565,10 @@
     direction: ltr;
   }
   .grid-lines span {
-    border-top: 1px dashed #edf0e8;
+    border-top: 1px dashed var(--tone-edf0e8, #edf0e8);
     width: 100%;
     font-size: 8px;
-    color: #bec6b4;
+    color: var(--tone-bec6b4, #bec6b4);
   }
   .bar-column {
     flex: 1;
@@ -497,14 +586,14 @@
     align-items: flex-end;
   }
   .bar {
-    background: #d8e3cd;
+    background: var(--tone-d8e3cd, #d8e3cd);
     width: 100%;
     border-radius: 4px 4px 0 0;
     position: relative;
     min-width: 12px;
   }
   .bar.current {
-    background: #79996b;
+    background: var(--tone-79996b, #79996b);
   }
   .bar > span {
     position: absolute;
@@ -512,16 +601,16 @@
     left: 0;
     right: 0;
     text-align: center;
-    color: #829674;
+    color: var(--tone-829674, #829674);
     font-size: 8px;
   }
   .bar-column > span {
-    color: #aab59a;
+    color: var(--tone-aab59a, #aab59a);
     font-size: 8px;
     white-space: nowrap;
   }
   .bar-column > span.current-label {
-    color: #678452;
+    color: var(--tone-678452, #678452);
   }
   .status-track {
     display: flex;
@@ -547,13 +636,13 @@
     display: flex;
     gap: 6px;
     font-size: 8px;
-    color: #9ba68e;
+    color: var(--tone-9ba68e, #9ba68e);
     justify-content: flex-start;
     white-space: nowrap;
   }
   .status-legend strong {
     margin-right: auto;
-    color: #7f8f70;
+    color: var(--tone-7f8f70, #7f8f70);
     font-size: 9px;
     font-weight: 400;
   }
@@ -570,7 +659,7 @@
     border-top: 1px solid var(--line);
     margin: 22px 23px 0;
     padding: 13px 0;
-    color: #a7b198;
+    color: var(--tone-a7b198, #a7b198);
     font-size: 8px;
   }
   .recent-list {
@@ -590,11 +679,11 @@
     display: block;
     font-size: 10px;
     font-weight: 500;
-    color: #7c8b70;
+    color: var(--tone-7c8b70, #7c8b70);
   }
   .recent-list small {
     display: block;
-    color: #b0b9a4;
+    color: var(--tone-b0b9a4, #b0b9a4);
     font-size: 8px;
     margin-top: 4px;
     text-align: right;
@@ -606,12 +695,12 @@
   }
   .recent-list :global(svg) {
     margin-right: auto;
-    color: #aeba9f;
+    color: var(--tone-aeba9f, #aeba9f);
   }
   .recent-all {
     font-size: 9px;
     margin: 0 22px 20px;
-    color: #80946b;
+    color: var(--tone-80946b, #80946b);
   }
   .queue-panel {
     scroll-margin-top: 20px;

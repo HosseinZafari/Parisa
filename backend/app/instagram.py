@@ -13,6 +13,8 @@ from .config import settings
 from .db import SessionLocal
 from .domain import notify, rows
 from .models import Conversation, Customer, Message, Order, WebhookEvent, now
+from .support import request_attention
+from .schemas import SupportSignal
 
 
 def verify_signature(body, signature):
@@ -90,7 +92,7 @@ def process_inbox():
             conv = start_chat(db, customer=customer, channel="instagram")
         last_interaction = max(customer.last_interaction_at, item.message_at)
         try:
-            state = process_message(db, conv, item.text, "ig:" + item.external_id, external_id=item.external_id)
+            process_message(db, conv, item.text, "ig:" + item.external_id, external_id=item.external_id)
             outgoing = db.scalar(
                 select(Message)
                 .where(Message.conversation_id == conv.id, Message.role == "assistant")
@@ -99,24 +101,9 @@ def process_inbox():
             if outgoing:
                 outgoing.delivery_status = "pending"
             item.status = "processed"
-            if state["handover"]:
-                notify(
-                    db,
-                    db.get(Order, conv.order_id) if conv.order_id else None,
-                    "handover",
-                    "گفتگوی اینستاگرام نیازمند پاسخ فروشنده است.",
-                    f"ig-handover:{item.id}",
-                )
         except HTTPException:
             item.status = "manual"
-            conv.handover = True
-            notify(
-                db,
-                db.get(Order, conv.order_id) if conv.order_id else None,
-                "instagram_manual",
-                "پیام اینستاگرام نیازمند پیگیری دستی است.",
-                f"ig-manual:{item.id}",
-            )
+            request_attention(db, conv, SupportSignal(reason="پیام اینستاگرام نیازمند پیگیری دستی است."))
         customer.last_interaction_at = last_interaction
         db.commit()
     return True
